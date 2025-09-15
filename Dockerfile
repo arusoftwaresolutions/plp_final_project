@@ -19,5 +19,5 @@ COPY backend/ .
 # Create models directory
 RUN mkdir -p models
 
-# Use startup script for proper initialization
-CMD ["python", "startup.py"]
+# Use PORT environment variable for Railway
+CMD ["sh", "-c", "uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000}"]
