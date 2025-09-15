@@ -166,3 +166,4 @@ def get_geospatial_statistics(
         "average_poverty_rate": round(avg_poverty_rate, 2),
         "location_coverage": round((families_with_location / total_families * 100), 2) if total_families > 0 else 0
     }
+

@@ -49,3 +49,4 @@ def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security), 
 
 def get_current_user(token: str = Depends(verify_token)):
     return token
+

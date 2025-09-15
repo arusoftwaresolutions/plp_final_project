@@ -165,3 +165,4 @@ class PovertyHotspot(Base):
     population = Column(Integer, nullable=False)
     description = Column(Text, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+

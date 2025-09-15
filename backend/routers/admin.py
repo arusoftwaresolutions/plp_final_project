@@ -130,3 +130,4 @@ def get_admin_stats(
         "approved_loans": approved_loans,
         "total_donated": float(total_donated)
     }
+

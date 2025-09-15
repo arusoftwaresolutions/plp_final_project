@@ -142,3 +142,4 @@ def get_loan_application(
         )
     
     return loan
+

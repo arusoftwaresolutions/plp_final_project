@@ -16,7 +16,7 @@ git push -u origin main
 1. Go to [railway.app](https://railway.app)
 2. Click "New Project" → "Deploy from GitHub repo"
 3. Select your repository
-4. Set **Root Directory** to `backend`
+4. **IMPORTANT**: Leave **Root Directory** empty (it will use the root Dockerfile)
 5. Click "Deploy Now"
 
 ### 3. Add PostgreSQL Database
@@ -60,3 +60,4 @@ python seed_data.py
 - **View Logs**: Click on service → "Deployments" → "View Logs"
 - **Redeploy**: Click "Redeploy" button
 - **Environment Variables**: Service → "Variables" tab
+

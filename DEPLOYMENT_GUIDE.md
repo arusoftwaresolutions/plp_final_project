@@ -286,3 +286,4 @@ python seed_data.py
 ---
 
 **🎉 Your Financial Platform is now live and ready to help families, donors, and businesses!**
+

@@ -230,3 +230,4 @@ def get_budget_forecast(
         "average_monthly_expenses": monthly_expenses,
         "average_monthly_savings": monthly_income - monthly_expenses
     }
+
