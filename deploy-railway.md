@@ -61,3 +61,23 @@ python seed_data.py
 - **Redeploy**: Click "Redeploy" button
 - **Environment Variables**: Service → "Variables" tab
 
+## 🚨 Troubleshooting
+
+### If deployment crashes:
+1. **Check Logs**: Go to service → "Deployments" → "View Logs"
+2. **Common Issues**:
+   - Database not connected: Check DATABASE_URL
+   - Missing environment variables: Add SECRET_KEY
+   - Port issues: Railway handles this automatically
+
+### Health Check URLs:
+- **Basic Health**: `https://your-app.railway.app/health`
+- **Database Health**: `https://your-app.railway.app/health/db`
+
+### Manual Database Setup:
+If automatic setup fails, run in Railway console:
+```bash
+alembic upgrade head
+python seed_data.py
+```
+

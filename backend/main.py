@@ -8,9 +8,19 @@ from database import get_db, engine
 from models import Base
 from routers import auth, families, donors, businesses, admin, ai, geospatial
 from config import settings
+import logging
 
-# Create database tables
-Base.metadata.create_all(bind=engine)
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+# Create database tables (with error handling)
+try:
+    Base.metadata.create_all(bind=engine)
+    logger.info("Database tables created successfully")
+except Exception as e:
+    logger.error(f"Error creating database tables: {e}")
+    # Don't crash the app if database is not available yet
 
 app = FastAPI(
     title="Financial Platform API",
@@ -44,7 +54,19 @@ async def root():
 
 @app.get("/health")
 async def health_check():
-    return {"status": "healthy"}
+    """Health check endpoint that doesn't require database"""
+    return {"status": "healthy", "message": "Financial Platform API is running"}
+
+@app.get("/health/db")
+async def health_check_db():
+    """Database health check"""
+    try:
+        from database import get_db
+        db = next(get_db())
+        db.execute("SELECT 1")
+        return {"status": "healthy", "database": "connected"}
+    except Exception as e:
+        return {"status": "unhealthy", "database": "disconnected", "error": str(e)}
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)
