@@ -1,5 +1,4 @@
-from pydantic import AnyHttpUrl, EmailStr, PostgresDsn, validator, Field
-from pydantic_settings import BaseSettings
+from pydantic import AnyHttpUrl, EmailStr, PostgresDsn, validator, Field, BaseSettings
 from typing import List, Optional, Union
 import os
 from dotenv import load_dotenv
