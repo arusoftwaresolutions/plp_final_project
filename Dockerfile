@@ -37,5 +37,5 @@ WORKDIR /app
 # Expose port
 EXPOSE 8000
 
-# Command to run the application
-CMD ["python", "-m", "uvicorn", "backend.app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Command to run the application with environment variable support
+CMD ["sh", "-c", "python -c \"import os; from uvicorn import run; run('backend.app.main:app', host='0.0.0.0', port=int(os.environ.get('PORT', 8000)))\n"]
