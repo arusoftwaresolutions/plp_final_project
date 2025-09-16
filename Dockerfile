@@ -49,13 +49,11 @@ ENV PYTHONUNBUFFERED=1
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONPATH="/app"
 
-# Set the working directory
+# Set the working directory to the backend
 WORKDIR /app/backend
 
 # Expose port
 EXPOSE 8000
 
 # Command to run the application with proper PORT handling
-CMD ["sh", "-c", "exec python -c \"\
-import os\n\
-port = int(os.environ.get('PORT', 8000))\nif port == 0:\n    port = 8000\n\nfrom uvicorn import run\nrun(\n    'app.main:app',\n    host='0.0.0.0',\n    port=port,\n    workers=int(os.environ.get('WEB_CONCURRENCY', 1)),\n    log_level=os.environ.get('LOG_LEVEL', 'info').lower()\n)\""]
+CMD ["sh", "-c", "cd /app/backend && uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000} --workers ${WEB_CONCURRENCY:-1} --log-level ${LOG_LEVEL:-info}"]
