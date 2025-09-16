@@ -5,7 +5,7 @@
     "buildCommand": "pip install -r backend/requirements.txt"
   },
   "deploy": {
-    "startCommand": "python -m uvicorn backend.app.main:app --host 0.0.0.0 --port $PORT",
+    "startCommand": "python -c \"import os; from uvicorn import run; run('backend.app.main:app', host='0.0.0.0', port=int(os.environ.get('PORT', 8000)))\"",
     "restartPolicyType": "ON_FAILURE",
     "restartPolicyMaxRetries": 10
   }
