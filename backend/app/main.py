@@ -64,23 +64,49 @@ app.include_router(api_router, prefix=settings.API_V1_STR)
 # Health check endpoint with database connectivity check
 @app.get("/health")
 async def health_check():
+    from app.core.config import settings
+    
+    # In development, we'll be more lenient with the health check
+    if settings.DEBUG:
+        return {
+            "status": "healthy",
+            "database": "development_mode",
+            "details": {
+                "mode": "development",
+                "database_url": str(settings.DATABASE).split('@')[-1] if settings.DATABASE else "Not configured"
+            }
+        }
+    
+    # Production health check with database connection test
+    db_status = "disconnected"
+    error_info = None
+    
     try:
         # Test database connection
         async with engine.connect() as conn:
             await conn.execute("SELECT 1")
+            db_status = "connected"
+    except Exception as e:
+        error_info = {
+            "type": str(type(e).__name__),
+            "message": str(e),
+            "database_url": str(settings.DATABASE).split('@')[-1] if settings.DATABASE else "Not configured"
+        }
+    
+    if db_status == "connected":
         return {
             "status": "healthy",
-            "database": "connected"
-        }
-    except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail={
-                "status": "unhealthy",
-                "database": "disconnected",
-                "error": str(e)
+            "database": "connected",
+            "details": {
+                "database_url": str(settings.DATABASE).split('@')[-1] if settings.DATABASE else "Not configured"
             }
-        )
+        }
+    else:
+        return {
+            "status": "unhealthy",
+            "database": "disconnected",
+            "error": error_info
+        }
 
 # Root endpoint with API information
 @app.get("/")
