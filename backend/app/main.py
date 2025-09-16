@@ -7,10 +7,10 @@ from typing import List, Optional
 import os
 from dotenv import load_dotenv
 
-from .core.config import settings
-from .api.api_v1.api import api_router
-from .db.session import engine, Base
-from .core.security import get_current_user
+from app.core.config import settings
+from app.api.api_v1.api import api_router
+from app.db.session import engine, Base
+from app.core.security import get_current_user
 
 # Load environment variables
 load_dotenv()
