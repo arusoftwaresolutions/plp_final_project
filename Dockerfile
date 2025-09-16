@@ -23,13 +23,19 @@ RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir -r requirements.txt
 
 # Copy backend application
-COPY backend/ /app/
+COPY . /app
+
+# Set the working directory to the backend
+WORKDIR /app/backend
 
 # Install the application in development mode
 RUN pip install -e .
+
+# Set the working directory back to /app
+WORKDIR /app
 
 # Expose port
 EXPOSE 8000
 
 # Command to run the application
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["python", "-m", "uvicorn", "backend.app.main:app", "--host", "0.0.0.0", "--port", "8000"]
