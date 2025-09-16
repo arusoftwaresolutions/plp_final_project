@@ -1,354 +1,274 @@
-# 💰 Financial Platform
+# Poverty Alleviation Platform
 
-A comprehensive Python-based financial platform that connects families, donors, and businesses to provide financial assistance, AI-powered budgeting advice, and loan management services.
+A comprehensive platform for poverty alleviation, aligned with SDG 1: No Poverty. This application provides financial literacy, microloans, and crowdfunding capabilities to help combat poverty.
 
-## 🚀 Features
+[![Deploy on Railway](https://railway.app/button.svg)](https://railway.app/new/template?template=)
 
-### 👨‍👩‍👧‍👦 Family Features
-- **Expense & Income Tracking**: Add and categorize financial transactions
-- **AI Budgeting Assistant**: Get personalized financial recommendations
-- **Interactive Dashboard**: Visualize spending patterns with charts and graphs
-- **Campaign Creation**: Create fundraising campaigns for financial needs
-- **Geospatial Integration**: View poverty hotspots and community resources
+## Features
 
-### 💝 Donor Features
-- **Browse Campaigns**: Discover families in need of financial assistance
-- **Secure Donations**: Make donations with integrated payment processing
-- **Donation Tracking**: Monitor your giving history and impact
-- **Anonymous Giving**: Option to donate anonymously
+- **Modern Web Interface**: Responsive design built with Streamlit
+- **User Authentication**: Secure login with JWT
+- **Financial Dashboard**: Track income, expenses, and financial health
+- **Microloans**: Apply for and manage microloans
+- **Crowdfunding**: Create and support poverty alleviation campaigns
+- **AI-Powered Insights**: Get personalized financial recommendations
+- **Admin Dashboard**: Manage users, loans, and campaigns
+- **Geospatial Visualization**: Interactive maps showing poverty-affected areas
 
-### 🏢 Business Features
-- **Loan Applications**: Apply for business loans with detailed purpose statements
-- **Application Tracking**: Monitor loan application status
-- **Business Profile**: Manage business information and financial details
+## Tech Stack
 
-### 👨‍💼 Admin Features
-- **Loan Management**: Review, approve, or reject loan applications
-- **Campaign Oversight**: Monitor all fundraising campaigns
-- **User Management**: View and manage platform users
-- **Analytics Dashboard**: Comprehensive platform statistics
+- **Backend**: FastAPI (Python 3.9+)
+- **Frontend**: Streamlit
+- **Database**: PostgreSQL
+- **Authentication**: JWT (JSON Web Tokens)
+- **Containerization**: Docker & Docker Compose
+- **Deployment**: Railway
+- **CI/CD**: GitHub Actions
 
-### 🤖 AI Features
-- **Smart Recommendations**: AI-powered budgeting and financial advice
-- **Spending Analysis**: Identify patterns and optimization opportunities
-- **Budget Forecasting**: Predict future financial trends
-- **Priority-based Alerts**: High, medium, and low priority recommendations
+## Prerequisites
 
-### 🗺️ Geospatial Features
-- **Poverty Hotspot Mapping**: Visualize areas with high poverty rates
-- **Family Location Tracking**: Map family locations for targeted assistance
-- **Interactive Maps**: Folium-powered interactive maps
-- **Distance Calculations**: Find families near poverty hotspots
-
-## 🛠️ Technology Stack
-
-### Backend
-- **FastAPI**: Modern, fast web framework for building APIs
-- **PostgreSQL**: Robust relational database with PostGIS extension
-- **SQLAlchemy**: Python SQL toolkit and ORM
-- **Alembic**: Database migration tool
-- **Pydantic**: Data validation using Python type annotations
-- **JWT**: Secure authentication with JSON Web Tokens
-
-### Frontend
-- **Streamlit**: Rapid web app development framework
-- **Plotly**: Interactive charts and visualizations
-- **Pandas**: Data manipulation and analysis
-- **Folium**: Interactive maps and geospatial visualization
-
-### AI/ML
-- **Scikit-learn**: Machine learning library for budgeting recommendations
-- **Joblib**: Model persistence and loading
-
-### Infrastructure
-- **Docker**: Containerization for easy deployment
-- **Docker Compose**: Multi-container orchestration
-- **PostGIS**: Geospatial database extensions
-
-## 📋 Prerequisites
-
+- Python 3.9+
 - Docker and Docker Compose
-- Python 3.11+ (for local development)
+- PostgreSQL 14+
+- Node.js 16+ (for frontend development)
 - Git
 
-## 🚀 Quick Start
+## Setup
 
-### 1. Clone the Repository
-```bash
-git clone <repository-url>
-cd financial-platform
+1. Clone the repository
+2. Install dependencies: `pip install -r requirements.txt`
+3. Set up environment variables (copy `.env.example` to `.env` and configure)
+4. Run migrations: `alembic upgrade head`
+5. Start the application: `docker-compose up --build`
+
+## Default Admin Credentials
+
+- Username: admin
+- Password: admin123
+
+## Project Structure
+
+```
+SDG!/
+├── backend/                 # FastAPI backend
+│   ├── app/
+│   │   ├── api/           # API endpoints (v1)
+│   │   ├── core/          # Core configurations
+│   │   ├── db/            # Database models and migrations
+│   │   ├── schemas/       # Pydantic models
+│   │   ├── services/      # Business logic
+│   │   └── main.py        # FastAPI application
+│   ├── tests/             # Backend tests
+│   ├── alembic/           # Database migrations
+│   └── requirements.txt   # Python dependencies
+│
+├── frontend/              # Streamlit frontend
+│   ├── src/
+│   │   ├── pages/        # Application pages
+│   │   │   ├── auth.py   # Authentication
+│   │   │   ├── dashboard.py
+│   │   │   ├── loans.py
+│   │   │   └── ...
+│   │   ├── services/     # API services
+│   │   ├── utils/        # Helper functions
+│   │   └── app.py        # Main Streamlit app
+│   └── requirements.txt  # Frontend dependencies
+│
+├── .github/              # GitHub workflows
+├── .dockerignore
+├── .env.example
+├── .gitignore
+├── docker-compose.yml
+├── Dockerfile
+├── railway.json
+├── runtime.txt
+└── README.md
 ```
 
-### 2. Start the Platform
-```bash
-docker-compose up --build
-```
+## Local Development
 
-### 3. Access the Applications
-- **Frontend**: http://localhost:8501
-- **Backend API**: http://localhost:8000
-- **API Documentation**: http://localhost:8000/docs
-- **Database**: localhost:5432
+### Using Docker (Recommended)
 
-### 4. Seed Demo Data
-```bash
-# Access the backend container
-docker-compose exec backend bash
+1. **Start the application**
+   ```bash
+   docker-compose up --build -d
+   ```
 
-# Run the seed script
-python seed_data.py
-```
+2. **Access the services**
+   - Frontend: http://localhost:8501
+   - Backend API: http://localhost:8000
+   - API Documentation: http://localhost:8000/docs
+   - PostgreSQL: localhost:5432
 
-## 🔧 Development Setup
+3. **View logs**
+   ```bash
+   docker-compose logs -f
+   ```
 
-### Backend Development
+### Manual Setup
+
+#### Backend
+
 ```bash
 cd backend
+python -m venv venv
+source venv/bin/activate  # On Windows: .\venv\Scripts\activate
 pip install -r requirements.txt
 
-# Set up environment variables
-export DATABASE_URL="postgresql://postgres:postgres@localhost:5432/financial_platform"
-export SECRET_KEY="your-secret-key"
+# Set environment variables
+cp ../.env.example .env
 
-# Run the backend
-uvicorn main:app --reload
-```
-
-### Frontend Development
-```bash
-cd frontend
-pip install -r requirements.txt
-
-# Set backend URL
-export BACKEND_URL="http://localhost:8000"
-
-# Run the frontend
-streamlit run app.py
-```
-
-### Database Setup
-```bash
-# Create database
-createdb financial_platform
-
-# Run migrations
-cd backend
+# Run database migrations
 alembic upgrade head
 
-# Seed data
-python seed_data.py
+# Start the development server
+uvicorn app.main:app --reload
 ```
 
-## 🧪 Testing
+#### Frontend
+
+```bash
+cd frontend
+python -m venv venv
+source venv/bin/activate  # On Windows: .\venv\Scripts\activate
+pip install -r requirements.txt
+
+# Start the Streamlit app
+streamlit run src/app.py
+```
+
+## Deployment
+
+The application is configured for deployment on Railway. You can deploy it with one click:
+
+[![Deploy on Railway](https://railway.app/button.svg)](https://railway.app/new/template?template=)
+
+### Manual Deployment to Railway
+
+1. **Install Railway CLI**
+   ```bash
+   npm i -g @railway/cli
+   ```
+
+2. **Login to Railway**
+   ```bash
+   railway login
+   ```
+
+3. **Link your project**
+   ```bash
+   railway init
+   ```
+
+4. **Set environment variables**
+   ```bash
+   railway env push .env.production
+   ```
+
+5. **Deploy**
+   ```bash
+   railway up
+   ```
+
+### Environment Variables
+
+Create a `.env` file in the root directory with the following variables:
+
+```
+# Backend
+SECRET_KEY=your-secret-key
+ALGORITHM=HS256
+ACCESS_TOKEN_EXPIRE_MINUTES=30
+
+# Database
+DATABASE_URL=postgresql://user:password@localhost:5432/dbname
+
+# Frontend
+API_BASE_URL=http://localhost:8000/api/v1
+
+# Production
+DEBUG=False
+ENVIRONMENT=production
+```
+
+## Testing
 
 ### Backend Tests
 ```bash
 cd backend
+# Install test requirements
+pip install -r requirements-test.txt
+
+# Run all tests
 pytest
+
+# Run tests with coverage report
+pytest --cov=app --cov-report=term-missing
 ```
 
 ### Frontend Tests
 ```bash
 cd frontend
-# Streamlit tests can be run manually through the UI
-# Automated testing can be added with pytest and selenium
+# Install test requirements
+pip install -r requirements-test.txt
+
+# Run tests
+pytest
 ```
 
-## 📊 API Documentation
+### End-to-End Testing
+For end-to-end testing, you can use the following command to test the entire stack:
 
-The API is fully documented with Swagger UI available at:
-- **Swagger UI**: http://localhost:8000/docs
-- **ReDoc**: http://localhost:8000/redoc
-
-### Key Endpoints
-
-#### Authentication
-- `POST /api/auth/register` - User registration
-- `POST /api/auth/login` - User login
-- `GET /api/auth/me` - Get current user info
-
-#### Family Management
-- `POST /api/families/profile` - Create family profile
-- `GET /api/families/dashboard` - Get dashboard data
-- `POST /api/families/transactions` - Add transaction
-- `GET /api/families/transactions` - Get transactions
-
-#### Donor Management
-- `GET /api/donors/campaigns` - Browse campaigns
-- `POST /api/donors/donate` - Make donation
-- `GET /api/donors/my-donations` - Get donation history
-
-#### AI Assistant
-- `GET /api/ai/recommendations` - Get AI recommendations
-- `POST /api/ai/generate-recommendations` - Generate new recommendations
-- `GET /api/ai/budget-forecast` - Get budget forecast
-
-#### Geospatial
-- `GET /api/geospatial/map` - Get map data
-- `GET /api/geospatial/poverty-hotspots` - Get poverty hotspots
-- `GET /api/geospatial/families-near-hotspot/{id}` - Find nearby families
-
-## 🔐 Security
-
-### Authentication
-- JWT-based authentication
-- Password hashing with bcrypt
-- Role-based access control (Family, Donor, Business, Admin)
-
-### Data Protection
-- Input validation with Pydantic
-- SQL injection prevention with SQLAlchemy ORM
-- CORS configuration for frontend-backend communication
-
-### Environment Variables
 ```bash
-# Required
-DATABASE_URL=postgresql://user:password@localhost:5432/dbname
-SECRET_KEY=your-secret-key-here
+# Start all services
+docker-compose up -d
 
-# Optional
-STRIPE_PUBLIC_KEY=your-stripe-public-key
-STRIPE_SECRET_KEY=your-stripe-secret-key
+# Run tests (example using curl for API testing)
+curl -X GET http://localhost:8000/api/v1/health
 ```
 
-## 🗄️ Database Schema
+## Contributing
 
-### Core Tables
-- **users**: User accounts and authentication
-- **family_profiles**: Family-specific information
-- **donor_profiles**: Donor information and statistics
-- **business_profiles**: Business information for loan applications
-- **transactions**: Financial transactions (income/expenses)
-- **campaigns**: Fundraising campaigns
-- **donations**: Donation records
-- **loan_applications**: Business loan applications
-- **ai_recommendations**: AI-generated financial advice
-- **poverty_hotspots**: Geospatial poverty data
+We welcome contributions from the community! Here's how you can help:
 
-## 🚀 Deployment
+1. **Report Bugs**
+   - Check if the issue already exists in the [Issues](https://github.com/your-repo/issues) section
+   - If not, create a new issue with a clear description and steps to reproduce
 
-### Production Deployment
-1. **Environment Setup**:
-   ```bash
-   # Set production environment variables
-   export DATABASE_URL="postgresql://user:password@prod-db:5432/financial_platform"
-   export SECRET_KEY="production-secret-key"
-   export STRIPE_SECRET_KEY="production-stripe-key"
-   ```
+2. **Suggest Enhancements**
+   - Open an issue with the `enhancement` label
+   - Describe the proposed changes and their benefits
 
-2. **Database Migration**:
-   ```bash
-   alembic upgrade head
-   ```
+3. **Code Contributions**
+   1. Fork the repository
+   2. Create a feature branch: `git checkout -b feature/your-feature`
+   3. Commit your changes: `git commit -m 'Add some feature'`
+   4. Push to the branch: `git push origin feature/your-feature`
+   5. Open a Pull Request
 
-3. **Docker Deployment**:
-   ```bash
-   docker-compose -f docker-compose.prod.yml up -d
-   ```
+4. **Code Style**
+   - Follow PEP 8 for Python code
+   - Include docstrings for all functions and classes
+   - Write meaningful commit messages
+   - Add tests for new features
 
-### Scaling Considerations
-- Use a production PostgreSQL database
-- Implement Redis for session management
-- Add load balancing for multiple backend instances
-- Use CDN for static assets
-- Implement proper logging and monitoring
+## Support
 
-## 🔧 Configuration
+If you need help or have questions:
 
-### Backend Configuration
-Edit `backend/config.py` to modify:
-- Database connection settings
-- JWT token expiration
-- AI model paths
-- Payment processor settings
+- **Documentation**: Check out our [documentation](https://github.com/your-repo/docs)
+- **Community**: Join our [Discord server](https://discord.gg/your-invite)
+- **Email**: support@povertyalleviation.org
+- **Issues**: Open an issue in our [GitHub repository](https://github.com/your-repo/issues)
 
-### Frontend Configuration
-Edit `frontend/app.py` to modify:
-- Backend API URL
-- UI themes and layouts
-- Chart configurations
+## License
 
-## 📈 Monitoring and Analytics
-
-### Built-in Analytics
-- User registration and activity tracking
-- Transaction volume and patterns
-- Donation statistics
-- Loan application metrics
-- AI recommendation effectiveness
-
-### Logging
-- Application logs in Docker containers
-- Database query logging
-- API request/response logging
-- Error tracking and reporting
-
-## 🤝 Contributing
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
-
-## 📝 License
-
-This project is licensed under the MIT License - see the LICENSE file for details.
-
-## 🆘 Support
-
-For support and questions:
-- Create an issue in the GitHub repository
-- Check the API documentation at `/docs`
-- Review the test cases for usage examples
-
-## 🔮 Future Enhancements
-
-- **Mobile App**: React Native or Flutter mobile application
-- **Advanced AI**: More sophisticated ML models for financial predictions
-- **Real Payments**: Full Stripe integration for actual payments
-- **Notifications**: Email and SMS notifications for important events
-- **Reporting**: Advanced reporting and analytics dashboard
-- **Multi-language**: Internationalization support
-- **Blockchain**: Cryptocurrency donation support
-- **Social Features**: Community features and social sharing
-
-## 📊 Demo Data
-
-The platform comes with comprehensive demo data including:
-- Sample families with transaction history
-- Mock poverty hotspots with geospatial data
-- Campaign examples with donation records
-- AI recommendations for different scenarios
-- Business loan applications in various states
-
-## 🎯 Use Cases
-
-### For Families
-- Track monthly income and expenses
-- Get AI-powered budgeting advice
-- Create fundraising campaigns for emergencies
-- Access community resources and support
-
-### For Donors
-- Discover families in need
-- Make secure donations
-- Track donation impact
-- Support specific causes or communities
-
-### For Businesses
-- Apply for business loans
-- Track application status
-- Access financial resources
-- Connect with the community
-
-### For Administrators
-- Manage loan applications
-- Oversee platform operations
-- Monitor user activity
-- Generate reports and analytics
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
 ---
 
-**Built with ❤️ using Python, FastAPI, Streamlit, and modern web technologies.**
+Built with ❤️ for a poverty-free world.
 
+[![Powered by FastAPI](https://img.shields.io/badge/Powered%20by-FastAPI-009688?style=for-the-badge&logo=fastapi)](https://fastapi.tiangolo.com/)
+[![Built with Streamlit](https://img.shields.io/badge/Built%20with-Streamlit-FF4B4B?style=for-the-badge&logo=streamlit)](https://streamlit.io/)
+[![Deploy on Railway](https://railway.app/button.svg)](https://railway.app/new/template?template=)
