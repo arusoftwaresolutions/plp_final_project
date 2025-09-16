@@ -7,7 +7,7 @@ from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
-from app.models.user import User
+from app.db.models import User
 from app.schemas.token import TokenPayload
 from app.services.user import user as user_service
 

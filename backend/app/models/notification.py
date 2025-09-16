@@ -61,8 +61,8 @@ class UserNotificationPreference(Base):
     def __repr__(self):
         return f"<UserNotificationPreference {self.user_id} - {self.notification_type}>"
 
-# Update the User model to include relationships
-from app.models.user import User  # Import here to avoid circular imports
+# Import User model from db.models to avoid circular imports
+from app.db.models import User
 
 # Add relationships to User model if not already present
 if not hasattr(User, 'notifications'):

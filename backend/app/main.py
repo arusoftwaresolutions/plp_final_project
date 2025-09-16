@@ -1,19 +1,27 @@
+import os
+from contextlib import asynccontextmanager
+from typing import List, Optional
+
 from fastapi import FastAPI, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import JSONResponse
-from contextlib import asynccontextmanager
-from typing import List, Optional
-import os
 from dotenv import load_dotenv
 
-from backend.app.core.config import settings
-from backend.app.api.api_v1.api import api_router
-from backend.app.db.session import engine, Base
-from backend.app.core.security import get_current_user
-
-# Load environment variables
+# Load environment variables first
 load_dotenv()
+
+# Then import local modules
+try:
+    from app.core.config import settings
+    from app.api.api_v1.api import api_router
+    from app.db.session import engine, Base
+    from app.core.security import get_current_user
+except ImportError as e:
+    import sys
+    print(f"Import error: {e}")
+    print(f"Python path: {sys.path}")
+    raise
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -88,4 +96,11 @@ async def root():
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("app.main:app", host="0.0.0.0", port=8000, reload=True)
+    uvicorn.run(
+        "app.main:app",
+        host="0.0.0.0",
+        port=int(os.getenv("PORT", "8000")),
+        reload=True,
+        reload_dirs=["app"],
+        log_level="info"
+    )

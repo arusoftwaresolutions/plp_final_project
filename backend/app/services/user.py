@@ -4,7 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.core.security import get_password_hash, verify_password
-from app.models.user import User, Role
+from app.db.models import User, Role
 from app.schemas.user import UserCreate, UserUpdate, UserInDB
 from app.services.base import CRUDBase
 

@@ -6,9 +6,9 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..core.config import settings
-from ..db.models import User, Role
-from ..db.session import get_db
+from app.core.config import settings
+from app.db.models import User, Role
+from app.db.session import get_db
 
 # Password hashing
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -173,7 +173,7 @@ def create_initial_admin_user() -> Dict[str, Any]:
     Returns:
         Dict containing admin user data
     """
-    from ..core.config import settings
+    from app.core.config import settings
     
     return {
         "username": settings.FIRST_SUPERUSER,
