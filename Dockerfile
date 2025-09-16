@@ -37,7 +37,11 @@ WORKDIR /app
 # Copy only necessary files from builder
 COPY --from=builder /opt/venv /opt/venv
 COPY --from=builder /app/backend /app/backend
-COPY --from=builder /app/backend.egg-info /app/backend.egg-info
+# Create backend.egg-info if it doesn't exist
+RUN cd /app/backend && \
+    if [ ! -d "backend.egg-info" ]; then \
+        python setup.py egg_info; \
+    fi
 
 # Set environment variables
 ENV PATH="/opt/venv/bin:$PATH"

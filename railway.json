@@ -2,7 +2,7 @@
   "$schema": "https://railway.app/railway.schema.json",
   "build": {
     "builder": "NIXPACKS",
-    "buildCommand": "cd backend && pip install -e ."
+    "buildCommand": "cd backend && pip install -e . && python setup.py egg_info"
   },
   "deploy": {
     "startCommand": "cd backend && python -c \"import os; port = int(os.environ.get('PORT', 8000)); port = 8000 if port == 0 else port; from uvicorn import run; run('app.main:app', host='0.0.0.0', port=port, workers=int(os.environ.get('WEB_CONCURRENCY', 2)))\"",
