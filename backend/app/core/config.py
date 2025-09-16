@@ -42,8 +42,19 @@ class Settings(BaseSettings):
     @validator("DATABASE_URL", pre=True)
     def assemble_db_connection(cls, v: Optional[str], values: dict) -> str:
         if isinstance(v, str):
-            return v.replace("postgresql://", "postgresql+asyncpg://")
-        return f"postgresql+asyncpg://{values.get('POSTGRES_USER')}:{values.get('POSTGRES_PASSWORD')}@{values.get('POSTGRES_SERVER')}/{values.get('POSTGRES_DB')}"
+            # Ensure the URL uses asyncpg
+            if v.startswith("postgresql://"):
+                return v.replace("postgresql://", "postgresql+asyncpg://", 1)
+            elif not v.startswith("postgresql+asyncpg://"):
+                return f"postgresql+asyncpg://{v}"
+            return v
+        # Build URL from components
+        return "postgresql+asyncpg://{user}:{password}@{server}/{db}".format(
+            user=values.get('POSTGRES_USER'),
+            password=values.get('POSTGRES_PASSWORD'),
+            server=values.get('POSTGRES_SERVER'),
+            db=values.get('POSTGRES_DB')
+        )
     
     @property
     def SYNC_DATABASE_URL(self) -> str:
@@ -53,6 +64,8 @@ class Settings(BaseSettings):
     @property
     def DATABASE(self) -> str:
         """Return the database URL."""
+        if self.DATABASE_URL:
+            return str(self.DATABASE_URL).replace("postgresql://", "postgresql+asyncpg://")
         return self.assemble_db_connection(None, {
             'POSTGRES_USER': self.POSTGRES_USER,
             'POSTGRES_PASSWORD': self.POSTGRES_PASSWORD,

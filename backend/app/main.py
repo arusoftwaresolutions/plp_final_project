@@ -53,18 +53,37 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 # Include API router
 app.include_router(api_router, prefix=settings.API_V1_STR)
 
-# Health check endpoint
+# Health check endpoint with database connectivity check
 @app.get("/health")
 async def health_check():
-    return {"status": "healthy"}
+    try:
+        # Test database connection
+        async with engine.connect() as conn:
+            await conn.execute("SELECT 1")
+        return {
+            "status": "healthy",
+            "database": "connected"
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "status": "unhealthy",
+                "database": "disconnected",
+                "error": str(e)
+            }
+        )
 
-# Root endpoint
+# Root endpoint with API information
 @app.get("/")
 async def root():
     return {
-        "message": "Welcome to the Poverty Alleviation Platform API",
+        "name": settings.PROJECT_NAME,
+        "version": settings.VERSION,
+        "environment": "production" if not settings.DEBUG else "development",
         "docs": "/docs",
-        "redoc": "/redoc"
+        "redoc": "/redoc",
+        "api_v1": "/api/v1"
     }
 
 if __name__ == "__main__":

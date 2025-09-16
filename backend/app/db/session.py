@@ -1,5 +1,5 @@
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
-from sqlalchemy.orm import sessionmaker, declarative_base
+from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
+from sqlalchemy.orm import declarative_base
 from sqlalchemy.pool import NullPool
 from typing import AsyncGenerator
 import os
@@ -13,11 +13,12 @@ engine = create_async_engine(
     future=True,
     pool_pre_ping=True,
     pool_recycle=300,
-    poolclass=NullPool
+    poolclass=NullPool,
+    connect_args={"server_settings": {"application_name": "poverty_alleviation_api"}}
 )
 
-# Create session factory
-AsyncSessionLocal = sessionmaker(
+# Create session factory using async_sessionmaker
+AsyncSessionLocal = async_sessionmaker(
     bind=engine,
     class_=AsyncSession,
     expire_on_commit=False,
