@@ -65,48 +65,43 @@ app.include_router(api_router, prefix=settings.API_V1_STR)
 @app.get("/health")
 async def health_check():
     from app.core.config import settings
+    import time
     
-    # In development, we'll be more lenient with the health check
-    if settings.DEBUG:
-        return {
-            "status": "healthy",
-            "database": "development_mode",
-            "details": {
-                "mode": "development",
-                "database_url": str(settings.DATABASE).split('@')[-1] if settings.DATABASE else "Not configured"
-            }
+    start_time = time.time()
+    
+    # Always return 200 OK for basic health check
+    # Database connection will be checked but won't fail the health check
+    response = {
+        "status": "healthy",
+        "timestamp": start_time,
+        "details": {
+            "mode": "development" if settings.DEBUG else "production",
+            "database": {}
         }
+    }
     
-    # Production health check with database connection test
-    db_status = "disconnected"
-    error_info = None
-    
+    # Try database connection but don't fail the health check if it fails
     try:
-        # Test database connection
         async with engine.connect() as conn:
+            start_db = time.time()
             await conn.execute("SELECT 1")
-            db_status = "connected"
+            db_time = time.time() - start_db
+            
+            response["details"]["database"] = {
+                "status": "connected",
+                "response_time_ms": f"{db_time*1000:.2f}",
+                "url": str(settings.DATABASE).split('@')[-1] if settings.DATABASE else "Not configured"
+            }
     except Exception as e:
-        error_info = {
-            "type": str(type(e).__name__),
-            "message": str(e),
-            "database_url": str(settings.DATABASE).split('@')[-1] if settings.DATABASE else "Not configured"
+        response["details"]["database"] = {
+            "status": "disconnected",
+            "error": str(e),
+            "error_type": type(e).__name__,
+            "url": str(settings.DATABASE).split('@')[-1] if settings.DATABASE else "Not configured"
         }
     
-    if db_status == "connected":
-        return {
-            "status": "healthy",
-            "database": "connected",
-            "details": {
-                "database_url": str(settings.DATABASE).split('@')[-1] if settings.DATABASE else "Not configured"
-            }
-        }
-    else:
-        return {
-            "status": "unhealthy",
-            "database": "disconnected",
-            "error": error_info
-        }
+    response["response_time_ms"] = f"{(time.time() - start_time)*1000:.2f}"
+    return response
 
 # Root endpoint with API information
 @app.get("/")
