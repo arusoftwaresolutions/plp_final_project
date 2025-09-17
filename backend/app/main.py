@@ -49,6 +49,20 @@ async def lifespan(app: FastAPI):
     try:
         # Print DATABASE diagnostics
         try:
+            # Raw environment variables as seen by the container
+            env_db_url = os.getenv("DATABASE_URL")
+            env_pg_server = os.getenv("POSTGRES_SERVER")
+            env_pg_port = os.getenv("POSTGRES_PORT")
+            env_pg_db = os.getenv("POSTGRES_DB")
+            env_pg_user = os.getenv("POSTGRES_USER")
+            env_pg_query = os.getenv("POSTGRES_QUERY")
+            print(f"[Startup] Raw env DATABASE_URL: {env_db_url!r}", flush=True)
+            print(f"[Startup] Raw env POSTGRES_SERVER: {env_pg_server!r}", flush=True)
+            print(f"[Startup] Raw env POSTGRES_PORT: {env_pg_port!r}", flush=True)
+            print(f"[Startup] Raw env POSTGRES_DB: {env_pg_db!r}", flush=True)
+            print(f"[Startup] Raw env POSTGRES_USER: {env_pg_user!r}", flush=True)
+            print(f"[Startup] Raw env POSTGRES_QUERY: {env_pg_query!r}", flush=True)
+
             db_url = settings.DATABASE
             parsed = make_url(db_url)
             db_host = parsed.host
