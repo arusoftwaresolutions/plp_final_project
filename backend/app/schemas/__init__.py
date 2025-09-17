@@ -37,12 +37,12 @@ from .microloan import (
     LoanRepaymentResponse,
 )
 
-# Crowdfunding schemas
+# Crowdfunding schemas (alias to match expected names in endpoints)
 from .crowdfunding import (
-    CrowdFundingCampaignBase,
-    CrowdFundingCampaignCreate,
-    CrowdFundingCampaignUpdate,
-    CrowdFundingCampaignResponse,
+    CampaignBase as CrowdFundingCampaignBase,
+    CampaignCreate as CrowdFundingCampaignCreate,
+    CampaignUpdate as CrowdFundingCampaignUpdate,
+    CampaignResponse as CrowdFundingCampaignResponse,
     DonationCreate,
     DonationResponse,
     DonationWithCampaignResponse,
