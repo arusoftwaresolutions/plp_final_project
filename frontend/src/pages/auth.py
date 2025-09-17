@@ -1,7 +1,6 @@
 import streamlit as st
 import requests
 from datetime import datetime, timedelta
-from jose import jwt
 import os
 from dotenv import load_dotenv
 
@@ -10,8 +9,6 @@ load_dotenv()
 
 # API configuration
 API_BASE_URL = os.getenv("API_BASE_URL", "http://localhost:8000/api/v1")
-SECRET_KEY = os.getenv("SECRET_KEY", "your-secret-key-here")
-ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
 
 def show_login_page():
@@ -53,9 +50,14 @@ def show_login_page():
 def login_user(email: str, password: str):
     """Authenticate user with the backend."""
     try:
+        # FastAPI endpoint expects OAuth2PasswordRequestForm-style form data
         response = requests.post(
-            f"{API_BASE_URL}/auth/login",
-            data={"username": email, "password": password}
+            f"{API_BASE_URL}/auth/login/access-token",
+            data={
+                "username": email,
+                "password": password,
+            },
+            headers={"Content-Type": "application/x-www-form-urlencoded"}
         )
         
         if response.status_code == 200:
@@ -63,23 +65,21 @@ def login_user(email: str, password: str):
             token = data.get("access_token")
             
             if token:
-                # Decode token to get user info
-                payload = jwt.decode(
-                    token,
-                    SECRET_KEY,
-                    algorithms=[ALGORITHM]
+                # Fetch current user profile from backend instead of decoding JWT on frontend
+                me_resp = requests.get(
+                    f"{API_BASE_URL}/users/me",
+                    headers={"Authorization": f"Bearer {token}"}
                 )
-                
-                # Update session state
-                st.session_state.state.token = token
-                st.session_state.state.user = {
-                    "id": payload.get("sub"),
-                    "email": payload.get("email"),
-                    "is_admin": payload.get("is_admin", False)
-                }
-                st.session_state.state.is_authenticated = True
-                st.session_state.state.is_admin = payload.get("is_admin", False)
-                st.experimental_rerun()
+                if me_resp.status_code == 200:
+                    user = me_resp.json()
+                    # Update session state
+                    st.session_state.state.token = token
+                    st.session_state.state.user = user
+                    st.session_state.state.is_authenticated = True
+                    st.session_state.state.is_admin = bool(user.get("is_superuser") or user.get("is_admin"))
+                    st.experimental_rerun()
+                else:
+                    st.error("Login succeeded but failed to load user profile.")
             else:
                 st.error("Invalid response from server")
         else:
