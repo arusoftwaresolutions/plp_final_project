@@ -37,12 +37,11 @@ RUN pip install -e .
 EXPOSE 8000
 
 # Create a simple startup script
-RUN echo '#!/bin/sh\n\
-# Wait for database to be available (if needed)\n# while ! nc -z $POSTGRES_SERVER 5432; do\n#   echo "Waiting for PostgreSQL..."\n#   sleep 1\ndone\n\n# Run migrations (if needed)\n# alembic upgrade head\n\n# Start the application\nexec uvicorn $APP_MODULE \\
-    --host 0.0.0.0 \\
-    --port ${PORT} \\
-    --workers ${WEB_CONCURRENCY} \\
-    --log-level ${LOG_LEVEL}\n' > /app/start.sh && chmod +x /app/start.sh
+RUN echo '#!/bin/sh\n\n# Wait for database to be available (if needed)\n# while ! nc -z $POSTGRES_SERVER 5432; do\n#   echo "Waiting for PostgreSQL..."\n#   sleep 1\n# done\n\n# Run migrations (if needed)\n# alembic upgrade head\n\n# Start the application\nexec uvicorn $APP_MODULE \
+    --host 0.0.0.0 \
+    --port $PORT \
+    --workers $WEB_CONCURRENCY \
+    --log-level $LOG_LEVEL\n' > /app/start.sh && chmod +x /app/start.sh
 
 # Health check configuration
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
