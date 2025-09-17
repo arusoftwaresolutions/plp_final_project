@@ -35,43 +35,41 @@ class Settings(BaseSettings):
             return v
         raise ValueError(v)
     
-    # Database
-    POSTGRES_SERVER: str = os.getenv("POSTGRES_SERVER", "db")
-    POSTGRES_USER: str = os.getenv("POSTGRES_USER", "postgres")
-    POSTGRES_PASSWORD: str = os.getenv("POSTGRES_PASSWORD", "postgres")
-    POSTGRES_DB: str = os.getenv("POSTGRES_DB", "poverty_alleviation")
-    POSTGRES_PORT: Optional[int] = int(os.getenv("POSTGRES_PORT", "0")) or None
-    # Optional query string, e.g. "sslmode=require"
-    POSTGRES_QUERY: Optional[str] = os.getenv("POSTGRES_QUERY")
-    # Use plain string for DATABASE_URL to allow driver prefixes like 'postgresql+asyncpg://'
-    DATABASE_URL: Optional[str] = None
+    # Railway provides these env vars
+    RAILWAY_ENVIRONMENT: str = os.getenv("RAILWAY_ENVIRONMENT", "")
+    RAILWAY_SERVICE_NAME: Optional[str] = os.getenv("RAILWAY_SERVICE_NAME")
+    
+    # Database - use Railway's PG* env vars if available, fall back to POSTGRES_* or defaults
+    POSTGRES_SERVER: str = os.getenv("PGHOST") or os.getenv("POSTGRES_SERVER", "db")
+    POSTGRES_USER: str = os.getenv("PGUSER") or os.getenv("POSTGRES_USER", "postgres")
+    POSTGRES_PASSWORD: str = os.getenv("PGPASSWORD") or os.getenv("POSTGRES_PASSWORD", "")
+    POSTGRES_DB: str = os.getenv("PGDATABASE") or os.getenv("POSTGRES_DB", "railway")
+    POSTGRES_PORT: str = os.getenv("PGPORT") or os.getenv("POSTGRES_PORT", "5432")
+    POSTGRES_QUERY: str = os.getenv("POSTGRES_QUERY", "sslmode=require")
+    
+    # Allow direct DATABASE_URL override from env
+    DATABASE_URL: Optional[str] = os.getenv("DATABASE_URL")
     
     @validator("DATABASE_URL", pre=True)
     def assemble_db_connection(cls, v: Optional[str], values: dict) -> str:
-        if isinstance(v, str):
-            # Normalize common prefixes and ensure asyncpg driver
-            url = v
-            # Some providers use 'postgres://' which SQLAlchemy warns about; normalize it first
-            if url.startswith("postgres://"):
-                url = url.replace("postgres://", "postgresql://", 1)
-            if url.startswith("postgresql+asyncpg://"):
-                return url
-            if url.startswith("postgresql://"):
-                return url.replace("postgresql://", "postgresql+asyncpg://", 1)
-            # Fallback: if a bare host or unknown scheme is provided, prefix asyncpg explicitly
-            return f"postgresql+asyncpg://{url}"
+        if v:
+            # Use provided DATABASE_URL, ensuring it uses asyncpg
+            url = v.replace("postgres://", "postgresql+asyncpg://", 1)
+            if not url.startswith("postgresql+asyncpg://"):
+                url = f"postgresql+asyncpg://{url}"
+            return url
+            
         # Build URL from components
-        user = values.get('POSTGRES_USER')
-        password = values.get('POSTGRES_PASSWORD')
-        server = values.get('POSTGRES_SERVER')
-        db = values.get('POSTGRES_DB')
-        port = values.get('POSTGRES_PORT')
-        query = values.get('POSTGRES_QUERY')
-        netloc = f"{server}:{port}" if port else server
-        url = f"postgresql+asyncpg://{user}:{password}@{netloc}/{db}"
-        if query:
-            url = f"{url}?{query}"
-        return url
+        user = values.get("POSTGRES_USER")
+        password = values.get("POSTGRES_PASSWORD")
+        server = values.get("POSTGRES_SERVER")
+        db = values.get("POSTGRES_DB")
+        port = values.get("POSTGRES_PORT", "5432")
+        query = values.get("POSTGRES_QUERY")
+        
+        # Construct URL with all components
+        url = f"postgresql+asyncpg://{user}:{password}@{server}:{port}/{db}"
+        return f"{url}?{query}" if query else url
     
     @property
     def SYNC_DATABASE_URL(self) -> str:
