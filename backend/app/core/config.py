@@ -42,12 +42,17 @@ class Settings(BaseSettings):
     @validator("DATABASE_URL", pre=True)
     def assemble_db_connection(cls, v: Optional[str], values: dict) -> str:
         if isinstance(v, str):
-            # Ensure the URL uses asyncpg
-            if v.startswith("postgresql://"):
-                return v.replace("postgresql://", "postgresql+asyncpg://", 1)
-            elif not v.startswith("postgresql+asyncpg://"):
-                return f"postgresql+asyncpg://{v}"
-            return v
+            # Normalize common prefixes and ensure asyncpg driver
+            url = v
+            # Some providers use 'postgres://' which SQLAlchemy warns about; normalize it first
+            if url.startswith("postgres://"):
+                url = url.replace("postgres://", "postgresql://", 1)
+            if url.startswith("postgresql+asyncpg://"):
+                return url
+            if url.startswith("postgresql://"):
+                return url.replace("postgresql://", "postgresql+asyncpg://", 1)
+            # Fallback: if a bare host or unknown scheme is provided, prefix asyncpg explicitly
+            return f"postgresql+asyncpg://{url}"
         # Build URL from components
         return "postgresql+asyncpg://{user}:{password}@{server}/{db}".format(
             user=values.get('POSTGRES_USER'),

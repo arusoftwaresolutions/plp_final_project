@@ -10,6 +10,8 @@ from fastapi.responses import JSONResponse
 from dotenv import load_dotenv
 import traceback
 from sqlalchemy import text, select
+from sqlalchemy.engine.url import make_url
+import socket
 
 # Load environment variables first
 load_dotenv()
@@ -43,6 +45,22 @@ except ImportError as e:
 async def lifespan(app: FastAPI):
     # Always ensure tables exist and seed an admin user on startup
     try:
+        # Print DATABASE diagnostics
+        try:
+            db_url = settings.DATABASE
+            parsed = make_url(db_url)
+            db_host = parsed.host
+            db_port = parsed.port
+            print(f"[Startup] Database URL driver: {parsed.drivername}", flush=True)
+            print(f"[Startup] Database host: {db_host} port: {db_port}", flush=True)
+            try:
+                socket.getaddrinfo(db_host, db_port or 5432)
+                print("[Startup] DNS: host resolves OK", flush=True)
+            except Exception as dns_e:
+                print(f"[Startup] DNS resolution failed for host '{db_host}': {dns_e}", flush=True)
+        except Exception as diag_e:
+            print(f"[Startup] Failed to parse DATABASE URL for diagnostics: {diag_e}", flush=True)
+
         print("[Startup] Creating database tables (if not exist)...", flush=True)
         async with engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
@@ -261,7 +279,48 @@ if os.path.isdir("static"):
 @app.get("/health", include_in_schema=False)
 async def health_check():
     """Simple health check endpoint that always returns 200 when the app is running."""
-    return {"status": "ok", "service": settings.PROJECT_NAME}
+    response = {"status": "ok"}
+    # Check database connection
+    try:
+        db_url = settings.DATABASE
+        parsed = make_url(db_url)
+        host = parsed.host
+        port = parsed.port or 5432
+        dns_ok = True
+        dns_error = None
+        try:
+            socket.getaddrinfo(host, port)
+        except Exception as e:
+            dns_ok = False
+            dns_error = str(e)
+
+        async with AsyncSessionLocal() as session:
+            await session.execute(text("SELECT 1"))
+        response["database"] = "connected"
+        response["db_host"] = host
+        response["db_port"] = port
+        response["dns_ok"] = dns_ok
+        if not dns_ok:
+            response["dns_error"] = dns_error
+    except Exception as e:
+        try:
+            db_url = settings.DATABASE
+            parsed = make_url(db_url)
+            host = parsed.host
+            port = parsed.port or 5432
+            response["db_host"] = host
+            response["db_port"] = port
+            try:
+                socket.getaddrinfo(host, port)
+                response["dns_ok"] = True
+            except Exception as de:
+                response["dns_ok"] = False
+                response["dns_error"] = str(de)
+        except Exception:
+            pass
+        response["database"] = f"disconnected: {str(e)}"
+    
+    return response
 
 # Liveness probe endpoint
 @app.get("/live", include_in_schema=False)
