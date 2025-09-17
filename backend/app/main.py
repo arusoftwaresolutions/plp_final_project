@@ -7,6 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import JSONResponse
 from dotenv import load_dotenv
+from sqlalchemy import text
 
 # Load environment variables first
 load_dotenv()
@@ -25,17 +26,24 @@ except ImportError as e:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Create database tables
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-    
+    # Create database tables (do not block startup if DB is unavailable)
+    try:
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+    except Exception as e:
+        # Log and continue so that the app can start and health check can pass
+        print(f"[Startup] Skipping DB init due to error: {e}")
+
     # Insert initial data if needed
     # await init_db()
-    
+
     yield
-    
+
     # Clean up resources
-    await engine.dispose()
+    try:
+        await engine.dispose()
+    except Exception as e:
+        print(f"[Shutdown] Error disposing engine: {e}")
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
@@ -55,8 +63,9 @@ if settings.BACKEND_CORS_ORIGINS:
         allow_headers=["*"],
     )
 
-# Mount static files
-app.mount("/static", StaticFiles(directory="static"), name="static")
+# Mount static files only if directory exists to avoid startup crash
+if os.path.isdir("static"):
+    app.mount("/static", StaticFiles(directory="static"), name="static")
 
 # Health check endpoints (must be defined before CORS middleware)
 @app.get("/health", include_in_schema=False)
@@ -82,7 +91,7 @@ async def readiness_probe():
     # Optional: Check database connection
     try:
         async with engine.connect() as conn:
-            await conn.execute("SELECT 1")
+            await conn.execute(text("SELECT 1"))
             response["database"] = "connected"
     except Exception as e:
         response["database"] = f"disconnected: {str(e)}"
