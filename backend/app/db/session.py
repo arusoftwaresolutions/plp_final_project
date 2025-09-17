@@ -3,8 +3,14 @@ from sqlalchemy.orm import declarative_base
 from sqlalchemy.pool import NullPool
 from typing import AsyncGenerator
 import os
+import ssl
 
 from app.core.config import settings
+
+# Create SSL context for secure connections
+ssl_context = ssl.create_default_context()
+ssl_context.check_hostname = False
+ssl_context.verify_mode = ssl.CERT_NONE  # Disable certificate verification (use CERT_REQUIRED in production)
 
 # Create async engine
 engine = create_async_engine(
@@ -13,8 +19,15 @@ engine = create_async_engine(
     future=True,
     pool_pre_ping=True,
     pool_recycle=300,
-    poolclass=NullPool,
-    connect_args={"server_settings": {"application_name": "poverty_alleviation_api"}}
+    pool_size=5,       # Maintain up to 5 connections
+    max_overflow=10,   # Allow up to 10 overflow connections
+    connect_args={
+        "ssl": ssl_context,  # Pass SSL context directly
+        "server_settings": {
+            "application_name": "poverty_alleviation_api",
+            "timezone": "UTC",
+        }
+    }
 )
 
 # Create session factory using async_sessionmaker

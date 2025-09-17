@@ -52,24 +52,44 @@ class Settings(BaseSettings):
     
     @validator("DATABASE_URL", pre=True)
     def assemble_db_connection(cls, v: Optional[str], values: dict) -> str:
-        if v:
-            # Use provided DATABASE_URL, ensuring it uses asyncpg
-            url = v.replace("postgres://", "postgresql+asyncpg://", 1)
-            if not url.startswith("postgresql+asyncpg://"):
-                url = f"postgresql+asyncpg://{url}"
-            return url
-            
-        # Build URL from components
-        user = values.get("POSTGRES_USER")
-        password = values.get("POSTGRES_PASSWORD")
-        server = values.get("POSTGRES_SERVER")
-        db = values.get("POSTGRES_DB")
-        port = values.get("POSTGRES_PORT", "5432")
-        query = values.get("POSTGRES_QUERY")
+        # Build connection parameters
+        params = {
+            "host": values.get("POSTGRES_SERVER", "db"),
+            "port": values.get("POSTGRES_PORT", "5432"),
+            "user": values.get("POSTGRES_USER", "postgres"),
+            "password": values.get("POSTGRES_PASSWORD", ""),
+            "database": values.get("POSTGRES_DB", "railway"),
+            "ssl": "require"  # Force SSL for all connections
+        }
         
-        # Construct URL with all components
-        url = f"postgresql+asyncpg://{user}:{password}@{server}:{port}/{db}"
-        return f"{url}?{query}" if query else url
+        # If DATABASE_URL is provided, parse it and update params
+        if v:
+            from urllib.parse import urlparse, parse_qs
+            try:
+                parsed = urlparse(v)
+                if parsed.hostname:
+                    params["host"] = parsed.hostname
+                if parsed.port:
+                    params["port"] = str(parsed.port)
+                if parsed.username:
+                    params["user"] = parsed.username
+                if parsed.password:
+                    params["password"] = parsed.password
+                if parsed.path.lstrip('/'):
+                    params["database"] = parsed.path.lstrip('/')
+                if parsed.query:
+                    query_params = parse_qs(parsed.query)
+                    if 'sslmode' in query_params:
+                        params["ssl"] = query_params['sslmode'][0]
+            except Exception as e:
+                print(f"[Config] Error parsing DATABASE_URL: {e}", flush=True)
+        
+        # Construct URL without query params first
+        url = f"postgresql+asyncpg://{params['user']}:{params['password']}@{params['host']}:{params['port']}/{params['database']}"
+        
+        # Add SSL as a connection argument instead of query param
+        # This prevents the 'sslmode' argument from being passed to asyncpg.connect()
+        return url
     
     @property
     def SYNC_DATABASE_URL(self) -> str:
