@@ -56,11 +56,16 @@ class Settings(BaseSettings):
     def assemble_db_connection(cls, v: Optional[str], values: dict) -> str:
         # Debug print all values for troubleshooting
         print(f"[Config] Assembling DB URL. DATABASE_URL: {v}", flush=True)
-        print(f"[Config] Values: {values}", flush=True)
+        print(f"[Config] Available values: {values}", flush=True)
         
-        # If DATABASE_URL is explicitly provided, use it directly
+        # If DATABASE_URL is explicitly provided in environment, use it directly
+        env_db_url = os.getenv("DATABASE_URL")
+        if env_db_url:
+            print(f"[Config] Using DATABASE_URL from environment", flush=True)
+            v = env_db_url
+        
         if v:
-            print(f"[Config] Using provided DATABASE_URL", flush=True)
+            print(f"[Config] Using DATABASE_URL: {v}", flush=True)
             # Convert postgres:// to postgresql+asyncpg://
             if v.startswith("postgres://"):
                 v = v.replace("postgres://", "postgresql+asyncpg://", 1)
@@ -70,23 +75,19 @@ class Settings(BaseSettings):
             return v
             
         # Otherwise build from components
-        user = values.get("POSTGRES_USER")
-        password = values.get("POSTGRES_PASSWORD")
-        host = values.get("POSTGRES_SERVER")
-        port = values.get("POSTGRES_PORT")
-        db = values.get("POSTGRES_DB")
-        query = values.get("POSTGRES_QUERY", "")
+        user = values.get("POSTGRES_USER") or os.getenv("POSTGRES_USER") or "postgres"
+        password = values.get("POSTGRES_PASSWORD") or os.getenv("POSTGRES_PASSWORD") or ""
+        host = values.get("POSTGRES_SERVER") or os.getenv("POSTGRES_SERVER") or "db"
+        port = values.get("POSTGRES_PORT") or os.getenv("POSTGRES_PORT") or "5432"
+        db = values.get("POSTGRES_DB") or os.getenv("POSTGRES_DB") or "railway"
+        query = values.get("POSTGRES_QUERY") or os.getenv("POSTGRES_QUERY") or ""
         
-        # Ensure all required components are present
-        if not all([user, host, port, db]):
-            raise ValueError("Missing required database connection parameters")
-        
-        # Construct the URL
+        # Construct the URL with defaults
         url = f"postgresql+asyncpg://{user}:{password}@{host}:{port}/{db}"
         if query:
             url = f"{url}?{query}"
         
-        print(f"[Config] Constructed database URL: {url}", flush=True)
+        print(f"[Config] Constructed database URL from components: {url}", flush=True)
         return url
     
     @property
@@ -97,14 +98,33 @@ class Settings(BaseSettings):
     @property
     def DATABASE(self) -> str:
         """Return the database URL."""
-        if self.DATABASE_URL:
-            return str(self.DATABASE_URL).replace("postgresql://", "postgresql+asyncpg://")
-        return self.assemble_db_connection(None, {
-            'POSTGRES_USER': self.POSTGRES_USER,
-            'POSTGRES_PASSWORD': self.POSTGRES_PASSWORD,
-            'POSTGRES_SERVER': self.POSTGRES_SERVER,
-            'POSTGRES_DB': self.POSTGRES_DB
-        })
+        # Try to get DATABASE_URL from environment first
+        env_db_url = os.getenv("DATABASE_URL")
+        if env_db_url:
+            if env_db_url.startswith("postgres://"):
+                env_db_url = env_db_url.replace("postgres://", "postgresql+asyncpg://", 1)
+            elif not (env_db_url.startswith("postgresql+asyncpg://") or env_db_url.startswith("postgresql://")):
+                env_db_url = f"postgresql+asyncpg://{env_db_url}"
+            return env_db_url
+            
+        # If we have a DATABASE_URL in settings, use it
+        if hasattr(self, 'DATABASE_URL') and self.DATABASE_URL:
+            return self.DATABASE_URL
+            
+        # Otherwise build from components
+        user = os.getenv("POSTGRES_USER") or getattr(self, 'POSTGRES_USER', 'postgres')
+        password = os.getenv("POSTGRES_PASSWORD") or getattr(self, 'POSTGRES_PASSWORD', '')
+        host = os.getenv("POSTGRES_SERVER") or getattr(self, 'POSTGRES_SERVER', 'db')
+        port = os.getenv("POSTGRES_PORT") or getattr(self, 'POSTGRES_PORT', '5432')
+        db = os.getenv("POSTGRES_DB") or getattr(self, 'POSTGRES_DB', 'railway')
+        query = os.getenv("POSTGRES_QUERY") or getattr(self, 'POSTGRES_QUERY', '')
+        
+        url = f"postgresql+asyncpg://{user}:{password}@{host}:{port}/{db}"
+        if query:
+            url = f"{url}?{query}"
+            
+        print(f"[Config] Final database URL: {url}", flush=True)
+        return url
     
     # Admin
     FIRST_SUPERUSER: str = os.getenv("FIRST_SUPERUSER", "admin")
