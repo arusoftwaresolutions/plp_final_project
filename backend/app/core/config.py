@@ -36,10 +36,10 @@ class Settings(BaseSettings):
         raise ValueError(v)
     
     # Railway provides these env vars
-    RAILWAY_ENVIRONMENT: str = os.getenv("RAILWAY_ENVIRONMENT", "production")
+    RAILWAY_ENVIRONMENT: str = os.getenv("RAILWAY_ENVIRONMENT", "production").lower()
     RAILWAY_SERVICE_NAME: Optional[str] = os.getenv("RAILWAY_SERVICE_NAME")
     
-    # Database connection settings - prioritize DATABASE_URL if provided
+    # Database connection settings
     DATABASE_URL: Optional[str] = os.getenv("DATABASE_URL")
     
     # Fallback to individual components if DATABASE_URL not provided
@@ -47,18 +47,20 @@ class Settings(BaseSettings):
     POSTGRES_USER: str = os.getenv("PGUSER") or os.getenv("POSTGRES_USER") or "postgres"
     POSTGRES_PASSWORD: str = os.getenv("PGPASSWORD") or os.getenv("POSTGRES_PASSWORD") or ""
     POSTGRES_DB: str = os.getenv("PGDATABASE") or os.getenv("POSTGRES_DB") or "railway"
-    POSTGRES_PORT: str = os.getenv("PGPORT") or os.getenv("POSTGRES_PORT") or "5432"
+    POSTGRES_PORT: str = str(os.getenv("PGPORT") or os.getenv("POSTGRES_PORT") or "5432")
     
     # Force SSL in production
     POSTGRES_QUERY: str = "sslmode=require" if RAILWAY_ENVIRONMENT == "production" else ""
     
-    # Allow direct DATABASE_URL override from env
-    DATABASE_URL: Optional[str] = os.getenv("DATABASE_URL")
-    
     @validator("DATABASE_URL", pre=True)
     def assemble_db_connection(cls, v: Optional[str], values: dict) -> str:
+        # Debug print all values for troubleshooting
+        print(f"[Config] Assembling DB URL. DATABASE_URL: {v}", flush=True)
+        print(f"[Config] Values: {values}", flush=True)
+        
         # If DATABASE_URL is explicitly provided, use it directly
         if v:
+            print(f"[Config] Using provided DATABASE_URL", flush=True)
             # Convert postgres:// to postgresql+asyncpg://
             if v.startswith("postgres://"):
                 v = v.replace("postgres://", "postgresql+asyncpg://", 1)
@@ -73,13 +75,18 @@ class Settings(BaseSettings):
         host = values.get("POSTGRES_SERVER")
         port = values.get("POSTGRES_PORT")
         db = values.get("POSTGRES_DB")
-        query = values.get("POSTGRES_QUERY")
+        query = values.get("POSTGRES_QUERY", "")
+        
+        # Ensure all required components are present
+        if not all([user, host, port, db]):
+            raise ValueError("Missing required database connection parameters")
         
         # Construct the URL
         url = f"postgresql+asyncpg://{user}:{password}@{host}:{port}/{db}"
         if query:
             url = f"{url}?{query}"
-            
+        
+        print(f"[Config] Constructed database URL: {url}", flush=True)
         return url
     
     @property

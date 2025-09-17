@@ -45,42 +45,58 @@ except ImportError as e:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # Print all environment variables for debugging
+    print("[Startup] Environment variables:", flush=True)
+    for key, value in sorted(os.environ.items()):
+        if any(k in key.lower() for k in ['db', 'postgres', 'database', 'railway']):
+            print(f"  {key}: {value}", flush=True)
+    
     # Always ensure tables exist and seed an admin user on startup
     try:
         # Print DATABASE diagnostics
         try:
-            # Raw environment variables as seen by the container
-            env_db_url = os.getenv("DATABASE_URL")
-            env_pg_server = os.getenv("POSTGRES_SERVER")
-            env_pg_port = os.getenv("POSTGRES_PORT")
-            env_pg_db = os.getenv("POSTGRES_DB")
-            env_pg_user = os.getenv("POSTGRES_USER")
-            env_pg_query = os.getenv("POSTGRES_QUERY")
-            print(f"[Startup] Raw env DATABASE_URL: {env_db_url!r}", flush=True)
-            print(f"[Startup] Raw env POSTGRES_SERVER: {env_pg_server!r}", flush=True)
-            print(f"[Startup] Raw env POSTGRES_PORT: {env_pg_port!r}", flush=True)
-            print(f"[Startup] Raw env POSTGRES_DB: {env_pg_db!r}", flush=True)
-            print(f"[Startup] Raw env POSTGRES_USER: {env_pg_user!r}", flush=True)
-            print(f"[Startup] Raw env POSTGRES_QUERY: {env_pg_query!r}", flush=True)
-
             db_url = settings.DATABASE
+            print(f"[Startup] Using database URL: {db_url}", flush=True)
+            
             parsed = make_url(db_url)
             db_host = parsed.host
-            db_port = parsed.port
-            print(f"[Startup] Database URL driver: {parsed.drivername}", flush=True)
-            print(f"[Startup] Database host: {db_host} port: {db_port}", flush=True)
+            db_port = parsed.port or 5432
+            
+            print(f"[Startup] Database configuration:", flush=True)
+            print(f"  Driver: {parsed.drivername}", flush=True)
+            print(f"  Host: {db_host}", flush=True)
+            print(f"  Port: {db_port}", flush=True)
+            print(f"  Database: {parsed.database}", flush=True)
+            print(f"  Username: {parsed.username}", flush=True)
+            
+            # Test DNS resolution
             try:
-                socket.getaddrinfo(db_host, db_port or 5432)
-                print("[Startup] DNS: host resolves OK", flush=True)
+                socket.getaddrinfo(db_host, db_port)
+                print("[Startup] DNS: Host resolves successfully", flush=True)
             except Exception as dns_e:
-                print(f"[Startup] DNS resolution failed for host '{db_host}': {dns_e}", flush=True)
-        except Exception as diag_e:
-            print(f"[Startup] Failed to parse DATABASE URL for diagnostics: {diag_e}", flush=True)
+                print(f"[Startup] WARNING: DNS resolution failed for host '{db_host}': {dns_e}", flush=True)
 
-        print("[Startup] Creating database tables (if not exist)...", flush=True)
-        async with engine.begin() as conn:
-            await conn.run_sync(Base.metadata.create_all)
-        print("[Startup] Tables are ready.", flush=True)
+            # Test database connection
+            print("[Startup] Testing database connection...", flush=True)
+            try:
+                async with engine.connect() as conn:
+                    result = await conn.execute(text("SELECT version()"))
+                    version = result.scalar()
+                    print(f"[Startup] Database version: {version}", flush=True)
+                
+                print("[Startup] Creating database tables (if not exist)...", flush=True)
+                async with engine.begin() as conn:
+                    await conn.run_sync(Base.metadata.create_all)
+                print("[Startup] Tables are ready.", flush=True)
+                
+            except Exception as db_error:
+                print(f"[Startup] ERROR: Database connection failed: {db_error}", flush=True)
+                print("[Startup] This is likely due to incorrect database configuration.", flush=True)
+                print("[Startup] Please check your DATABASE_URL or individual database environment variables.", flush=True)
+                raise
+        except Exception as e:
+            print(f"[Startup] Error during database initialization: {e}", flush=True)
+            raise
 
         # Seed admin role and user
         async with AsyncSessionLocal() as db:
