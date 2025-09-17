@@ -1,4 +1,4 @@
-""
+"""
 Poverty Alleviation Platform - Frontend
 
 This package contains the frontend application for the Poverty Alleviation Platform.

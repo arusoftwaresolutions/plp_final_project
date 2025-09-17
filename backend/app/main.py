@@ -61,46 +61,36 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 # Include API router
 app.include_router(api_router, prefix=settings.API_V1_STR)
 
-# Health check endpoint with database connectivity check
-@app.get("/health")
+# Simple health check endpoint
+@app.get("/health", include_in_schema=False)
+@app.get("/", include_in_schema=False)
 async def health_check():
-    from app.core.config import settings
-    import time
-    
-    start_time = time.time()
-    
-    # Always return 200 OK for basic health check
-    # Database connection will be checked but won't fail the health check
+    """Simple health check endpoint that always returns 200 when the app is running."""
+    return {"status": "ok", "service": settings.PROJECT_NAME}
+
+# Liveness probe endpoint
+@app.get("/live", include_in_schema=False)
+async def liveness_probe():
+    """Liveness probe for Kubernetes/container orchestration."""
+    return {"status": "alive"}
+
+# Readiness probe endpoint with optional database check
+@app.get("/ready", include_in_schema=False)
+async def readiness_probe():
+    """Readiness probe that checks if the application is ready to receive traffic."""
     response = {
-        "status": "healthy",
-        "timestamp": start_time,
-        "details": {
-            "mode": "development" if settings.DEBUG else "production",
-            "database": {}
-        }
+        "status": "ready",
+        "database": "unknown"
     }
     
-    # Try database connection but don't fail the health check if it fails
+    # Optional: Check database connection
     try:
         async with engine.connect() as conn:
-            start_db = time.time()
             await conn.execute("SELECT 1")
-            db_time = time.time() - start_db
-            
-            response["details"]["database"] = {
-                "status": "connected",
-                "response_time_ms": f"{db_time*1000:.2f}",
-                "url": str(settings.DATABASE).split('@')[-1] if settings.DATABASE else "Not configured"
-            }
+            response["database"] = "connected"
     except Exception as e:
-        response["details"]["database"] = {
-            "status": "disconnected",
-            "error": str(e),
-            "error_type": type(e).__name__,
-            "url": str(settings.DATABASE).split('@')[-1] if settings.DATABASE else "Not configured"
-        }
+        response["database"] = f"disconnected: {str(e)}"
     
-    response["response_time_ms"] = f"{(time.time() - start_time)*1000:.2f}"
     return response
 
 # Root endpoint with API information
