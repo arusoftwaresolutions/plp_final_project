@@ -6,7 +6,8 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONPATH="/app/backend" \
     PORT=8000 \
     WEB_CONCURRENCY=1 \
-    LOG_LEVEL=info
+    LOG_LEVEL=info \
+    APP_MODULE="app.main:app"
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -24,7 +25,7 @@ COPY backend/requirements.txt .
 
 # Install Python dependencies
 RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir -r requirements.txt
+    pip install --no-cache-dir -r requirements.txt uvicorn[standard]
 
 # Copy backend code
 COPY backend/ .
@@ -35,14 +36,17 @@ RUN pip install -e .
 # Expose the port the app runs on
 EXPOSE 8000
 
-# Install curl for health checks
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    curl \
-    && rm -rf /var/lib/apt/lists/*
+# Create a simple startup script
+RUN echo '#!/bin/sh\n\
+# Wait for database to be available (if needed)\n# while ! nc -z $POSTGRES_SERVER 5432; do\n#   echo "Waiting for PostgreSQL..."\n#   sleep 1\ndone\n\n# Run migrations (if needed)\n# alembic upgrade head\n\n# Start the application\nexec uvicorn $APP_MODULE \\
+    --host 0.0.0.0 \\
+    --port ${PORT} \\
+    --workers ${WEB_CONCURRENCY} \\
+    --log-level ${LOG_LEVEL}\n' > /app/start.sh && chmod +x /app/start.sh
 
 # Health check configuration
-HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
-  CMD curl -f http://localhost:${PORT:-8000}/health || exit 1
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+  CMD curl -f http://localhost:${PORT}/health || exit 1
 
-# Command to run the application with auto-reload in development
-CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000} --workers ${WEB_CONCURRENCY:-1} --log-level ${LOG_LEVEL:-info}"]
+# Command to run the application
+CMD ["/app/start.sh"]

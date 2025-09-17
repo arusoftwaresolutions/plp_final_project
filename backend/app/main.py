@@ -58,12 +58,8 @@ if settings.BACKEND_CORS_ORIGINS:
 # Mount static files
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
-# Include API router
-app.include_router(api_router, prefix=settings.API_V1_STR)
-
-# Simple health check endpoint
+# Health check endpoints (must be defined before CORS middleware)
 @app.get("/health", include_in_schema=False)
-@app.get("/", include_in_schema=False)
 async def health_check():
     """Simple health check endpoint that always returns 200 when the app is running."""
     return {"status": "ok", "service": settings.PROJECT_NAME}
@@ -92,6 +88,9 @@ async def readiness_probe():
         response["database"] = f"disconnected: {str(e)}"
     
     return response
+
+# Include API router after health checks
+app.include_router(api_router, prefix=settings.API_V1_STR)
 
 # Root endpoint with API information
 @app.get("/")
