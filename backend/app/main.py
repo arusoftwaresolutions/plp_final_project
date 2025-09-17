@@ -15,7 +15,6 @@ load_dotenv()
 # Then import local modules
 try:
     from app.core.config import settings
-    from app.api.api_v1.api import api_router
     from app.db.session import engine, Base
     from app.core.security import get_current_user
 except ImportError as e:
@@ -26,24 +25,9 @@ except ImportError as e:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Create database tables (do not block startup if DB is unavailable)
-    try:
-        async with engine.begin() as conn:
-            await conn.run_sync(Base.metadata.create_all)
-    except Exception as e:
-        # Log and continue so that the app can start and health check can pass
-        print(f"[Startup] Skipping DB init due to error: {e}")
-
-    # Insert initial data if needed
-    # await init_db()
-
+    # IMPORTANT: Do not touch the database during startup so the app can become healthy fast.
+    # Any DB initialization should be triggered separately (e.g., via migrations) or via /ready checks.
     yield
-
-    # Clean up resources
-    try:
-        await engine.dispose()
-    except Exception as e:
-        print(f"[Shutdown] Error disposing engine: {e}")
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
@@ -98,8 +82,12 @@ async def readiness_probe():
     
     return response
 
-# Include API router after health checks
-app.include_router(api_router, prefix=settings.API_V1_STR)
+# Include API router after health checks, but do not fail startup if routers have issues
+try:
+    from app.api.api_v1.api import api_router  # defer import to avoid slowing initial import
+    app.include_router(api_router, prefix=settings.API_V1_STR)
+except Exception as e:
+    print(f"[Startup] Routers not loaded yet: {e}")
 
 # Root endpoint with API information
 @app.get("/")
