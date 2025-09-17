@@ -36,59 +36,50 @@ class Settings(BaseSettings):
         raise ValueError(v)
     
     # Railway provides these env vars
-    RAILWAY_ENVIRONMENT: str = os.getenv("RAILWAY_ENVIRONMENT", "")
+    RAILWAY_ENVIRONMENT: str = os.getenv("RAILWAY_ENVIRONMENT", "production")
     RAILWAY_SERVICE_NAME: Optional[str] = os.getenv("RAILWAY_SERVICE_NAME")
     
-    # Database - use Railway's PG* env vars if available, fall back to POSTGRES_* or defaults
-    POSTGRES_SERVER: str = os.getenv("PGHOST") or os.getenv("POSTGRES_SERVER", "db")
-    POSTGRES_USER: str = os.getenv("PGUSER") or os.getenv("POSTGRES_USER", "postgres")
-    POSTGRES_PASSWORD: str = os.getenv("PGPASSWORD") or os.getenv("POSTGRES_PASSWORD", "")
-    POSTGRES_DB: str = os.getenv("PGDATABASE") or os.getenv("POSTGRES_DB", "railway")
-    POSTGRES_PORT: str = os.getenv("PGPORT") or os.getenv("POSTGRES_PORT", "5432")
-    POSTGRES_QUERY: str = os.getenv("POSTGRES_QUERY", "sslmode=require")
+    # Database connection settings - prioritize DATABASE_URL if provided
+    DATABASE_URL: Optional[str] = os.getenv("DATABASE_URL")
+    
+    # Fallback to individual components if DATABASE_URL not provided
+    POSTGRES_SERVER: str = os.getenv("PGHOST") or os.getenv("POSTGRES_SERVER") or "db"
+    POSTGRES_USER: str = os.getenv("PGUSER") or os.getenv("POSTGRES_USER") or "postgres"
+    POSTGRES_PASSWORD: str = os.getenv("PGPASSWORD") or os.getenv("POSTGRES_PASSWORD") or ""
+    POSTGRES_DB: str = os.getenv("PGDATABASE") or os.getenv("POSTGRES_DB") or "railway"
+    POSTGRES_PORT: str = os.getenv("PGPORT") or os.getenv("POSTGRES_PORT") or "5432"
+    
+    # Force SSL in production
+    POSTGRES_QUERY: str = "sslmode=require" if RAILWAY_ENVIRONMENT == "production" else ""
     
     # Allow direct DATABASE_URL override from env
     DATABASE_URL: Optional[str] = os.getenv("DATABASE_URL")
     
     @validator("DATABASE_URL", pre=True)
     def assemble_db_connection(cls, v: Optional[str], values: dict) -> str:
-        # Build connection parameters
-        params = {
-            "host": values.get("POSTGRES_SERVER", "db"),
-            "port": values.get("POSTGRES_PORT", "5432"),
-            "user": values.get("POSTGRES_USER", "postgres"),
-            "password": values.get("POSTGRES_PASSWORD", ""),
-            "database": values.get("POSTGRES_DB", "railway"),
-            "ssl": "require"  # Force SSL for all connections
-        }
-        
-        # If DATABASE_URL is provided, parse it and update params
+        # If DATABASE_URL is explicitly provided, use it directly
         if v:
-            from urllib.parse import urlparse, parse_qs
-            try:
-                parsed = urlparse(v)
-                if parsed.hostname:
-                    params["host"] = parsed.hostname
-                if parsed.port:
-                    params["port"] = str(parsed.port)
-                if parsed.username:
-                    params["user"] = parsed.username
-                if parsed.password:
-                    params["password"] = parsed.password
-                if parsed.path.lstrip('/'):
-                    params["database"] = parsed.path.lstrip('/')
-                if parsed.query:
-                    query_params = parse_qs(parsed.query)
-                    if 'sslmode' in query_params:
-                        params["ssl"] = query_params['sslmode'][0]
-            except Exception as e:
-                print(f"[Config] Error parsing DATABASE_URL: {e}", flush=True)
+            # Convert postgres:// to postgresql+asyncpg://
+            if v.startswith("postgres://"):
+                v = v.replace("postgres://", "postgresql+asyncpg://", 1)
+            # Ensure it uses asyncpg
+            elif not (v.startswith("postgresql+asyncpg://") or v.startswith("postgresql://")):
+                v = f"postgresql+asyncpg://{v}"
+            return v
+            
+        # Otherwise build from components
+        user = values.get("POSTGRES_USER")
+        password = values.get("POSTGRES_PASSWORD")
+        host = values.get("POSTGRES_SERVER")
+        port = values.get("POSTGRES_PORT")
+        db = values.get("POSTGRES_DB")
+        query = values.get("POSTGRES_QUERY")
         
-        # Construct URL without query params first
-        url = f"postgresql+asyncpg://{params['user']}:{params['password']}@{params['host']}:{params['port']}/{params['database']}"
-        
-        # Add SSL as a connection argument instead of query param
-        # This prevents the 'sslmode' argument from being passed to asyncpg.connect()
+        # Construct the URL
+        url = f"postgresql+asyncpg://{user}:{password}@{host}:{port}/{db}"
+        if query:
+            url = f"{url}?{query}"
+            
         return url
     
     @property
