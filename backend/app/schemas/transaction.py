@@ -114,6 +114,10 @@ class TransactionFilter(BaseModel):
     end_date: Optional[datetime] = None
     transaction_types: Optional[List[TransactionType]] = None
     categories: Optional[List[TransactionCategory]] = None
+    # Additional fields used by legacy services
+    type: Optional[TransactionType] = None
+    category_id: Optional[int] = None
+    description: Optional[str] = None
     min_amount: Optional[float] = None
     max_amount: Optional[float] = None
     
@@ -137,3 +141,29 @@ class TransactionFilter(BaseModel):
                 if values['min_amount'] > values['max_amount']:
                     raise ValueError('Minimum amount cannot be greater than maximum amount')
         return v
+
+# ------------------------------------------------------------
+# Category Schemas expected by services (create/update)
+# ------------------------------------------------------------
+
+class TransactionCategoryBase(BaseModel):
+    """
+    Base schema for transaction category (used by services).
+    """
+    name: str
+    type: TransactionType
+    is_system: bool = False
+    icon: Optional[str] = None
+    affects_balance: bool = True
+
+class TransactionCategoryCreate(TransactionCategoryBase):
+    """Schema for creating a transaction category."""
+    pass
+
+class TransactionCategoryUpdate(BaseModel):
+    """Schema for updating a transaction category."""
+    name: Optional[str] = None
+    type: Optional[TransactionType] = None
+    is_system: Optional[bool] = None
+    icon: Optional[str] = None
+    affects_balance: Optional[bool] = None
