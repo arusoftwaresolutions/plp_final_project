@@ -13,8 +13,10 @@ from sqlalchemy import text, select
 from sqlalchemy.engine.url import make_url
 import socket
 
-# Load environment variables first
-load_dotenv()
+# Load environment variables first (only in development)
+_ENV = os.getenv("ENVIRONMENT", "production").lower()
+if _ENV in ("dev", "development", "local"):
+    load_dotenv(override=True)
 
 # Then import local modules
 try:
