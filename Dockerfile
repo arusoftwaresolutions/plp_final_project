@@ -34,5 +34,5 @@ EXPOSE 8000
 HEALTHCHECK --interval=10s --timeout=5s --start-period=60s --retries=10 \
   CMD curl -f http://localhost:${PORT:-8000}/live || exit 1
 
-# Command to run the application (bind to dynamic PORT if provided)
-CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000} --log-level debug"]
+# Command to run the application via launcher (binds to dynamic PORT if provided)
+CMD ["python", "-m", "backend.launch"]
