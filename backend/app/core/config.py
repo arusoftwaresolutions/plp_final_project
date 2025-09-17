@@ -3,14 +3,17 @@ from typing import List, Optional, Union
 import os
 from dotenv import load_dotenv
 
-# Load environment variables
-load_dotenv()
+# Load .env only in development to avoid overriding production env on Railway
+_ENV = os.getenv("ENVIRONMENT", "production").lower()
+if _ENV in ("dev", "development", "local"):
+    load_dotenv(override=True)
 
 class Settings(BaseSettings):
     # Project
     PROJECT_NAME: str = os.getenv("BACKEND_APP_NAME", "Poverty Alleviation Platform")
     VERSION: str = os.getenv("BACKEND_APP_VERSION", "1.0.0")
     DEBUG: bool = os.getenv("BACKEND_DEBUG", False)
+    ENVIRONMENT: str = os.getenv("ENVIRONMENT", "production")
     API_V1_STR: str = "/api/v1"
     
     # Security
@@ -37,7 +40,11 @@ class Settings(BaseSettings):
     POSTGRES_USER: str = os.getenv("POSTGRES_USER", "postgres")
     POSTGRES_PASSWORD: str = os.getenv("POSTGRES_PASSWORD", "postgres")
     POSTGRES_DB: str = os.getenv("POSTGRES_DB", "poverty_alleviation")
-    DATABASE_URL: Optional[PostgresDsn] = None
+    POSTGRES_PORT: Optional[int] = int(os.getenv("POSTGRES_PORT", "0")) or None
+    # Optional query string, e.g. "sslmode=require"
+    POSTGRES_QUERY: Optional[str] = os.getenv("POSTGRES_QUERY")
+    # Use plain string for DATABASE_URL to allow driver prefixes like 'postgresql+asyncpg://'
+    DATABASE_URL: Optional[str] = None
     
     @validator("DATABASE_URL", pre=True)
     def assemble_db_connection(cls, v: Optional[str], values: dict) -> str:
@@ -54,12 +61,17 @@ class Settings(BaseSettings):
             # Fallback: if a bare host or unknown scheme is provided, prefix asyncpg explicitly
             return f"postgresql+asyncpg://{url}"
         # Build URL from components
-        return "postgresql+asyncpg://{user}:{password}@{server}/{db}".format(
-            user=values.get('POSTGRES_USER'),
-            password=values.get('POSTGRES_PASSWORD'),
-            server=values.get('POSTGRES_SERVER'),
-            db=values.get('POSTGRES_DB')
-        )
+        user = values.get('POSTGRES_USER')
+        password = values.get('POSTGRES_PASSWORD')
+        server = values.get('POSTGRES_SERVER')
+        db = values.get('POSTGRES_DB')
+        port = values.get('POSTGRES_PORT')
+        query = values.get('POSTGRES_QUERY')
+        netloc = f"{server}:{port}" if port else server
+        url = f"postgresql+asyncpg://{user}:{password}@{netloc}/{db}"
+        if query:
+            url = f"{url}?{query}"
+        return url
     
     @property
     def SYNC_DATABASE_URL(self) -> str:
