@@ -293,15 +293,16 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# Set up CORS
-if settings.BACKEND_CORS_ORIGINS:
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=[str(origin) for origin in settings.BACKEND_CORS_ORIGINS],
-        allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
-    )
+# Configure CORS
+print(f"[Startup] Configuring CORS with origins: {settings.BACKEND_CORS_ORIGINS}", flush=True)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[str(origin) for origin in settings.BACKEND_CORS_ORIGINS],
+    allow_origin_regex=r'https?://(?:[a-z0-9-]+\.)?yourdomain\.com',  # Add your domain pattern here
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # Mount static files only if directory exists to avoid startup crash
 if os.path.isdir("static"):
