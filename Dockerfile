@@ -3,22 +3,15 @@ FROM python:3.9-slim
 # Set environment variables
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    PYTHONPATH="/app/backend" \
-    PORT=8000 \
-    WEB_CONCURRENCY=1 \
-    LOG_LEVEL=info \
-    APP_MODULE="app.main:app"
+    PORT=8000
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    gcc \
-    python3-dev \
-    libpq-dev \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
 # Create and set working directory
-WORKDIR /app/backend
+WORKDIR /app
 
 # Copy requirements first to leverage Docker cache
 COPY backend/requirements.txt .
@@ -36,16 +29,9 @@ RUN pip install -e .
 # Expose the port the app runs on
 EXPOSE 8000
 
-# Create a simple startup script
-RUN echo '#!/bin/sh\n\n# Wait for database to be available (if needed)\n# while ! nc -z $POSTGRES_SERVER 5432; do\n#   echo "Waiting for PostgreSQL..."\n#   sleep 1\n# done\n\n# Run migrations (if needed)\n# alembic upgrade head\n\n# Start the application\nexec uvicorn $APP_MODULE \
-    --host 0.0.0.0 \
-    --port $PORT \
-    --workers $WEB_CONCURRENCY \
-    --log-level $LOG_LEVEL\n' > /app/start.sh && chmod +x /app/start.sh
-
-# Health check configuration
+# Simple health check
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-  CMD curl -f http://localhost:${PORT}/health || exit 1
+  CMD curl -f http://localhost:8000/health || exit 1
 
 # Command to run the application
-CMD ["/app/start.sh"]
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
