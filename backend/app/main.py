@@ -8,6 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import JSONResponse
 from dotenv import load_dotenv
+import traceback
 from sqlalchemy import text, select
 
 # Load environment variables first
@@ -230,6 +231,7 @@ async def lifespan(app: FastAPI):
             print("[Startup] Sample data ensured.", flush=True)
     except Exception as e:
         print(f"[Startup] Initialization error: {e}", flush=True)
+        traceback.print_exc()
 
     yield
 
@@ -292,6 +294,7 @@ try:
     app.include_router(api_router, prefix=settings.API_V1_STR)
 except Exception as e:
     print(f"[Startup] Routers not loaded yet: {e}")
+    traceback.print_exc()
 
 # Root endpoint with API information
 @app.get("/")
