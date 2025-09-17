@@ -80,17 +80,26 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# Import pages
-from pages import (
-    dashboard,
-    transactions,
-    loans,
-    crowdfunding,
-    insights,
-    admin,
-    auth,
-    settings
-)
+# Lazy import pages to avoid startup crashes if a page has an import issue
+import importlib
+
+def safe_import(module_path: str):
+    try:
+        return importlib.import_module(module_path)
+    except Exception as e:
+        def _fallback_show():
+            st.error(f"Failed to load page '{module_path}'.")
+            st.exception(e)
+        return type("_MissingPage", (), {"show": staticmethod(_fallback_show)})
+
+dashboard = safe_import("pages.dashboard")
+transactions = safe_import("pages.transactions")
+loans = safe_import("pages.loans")
+crowdfunding = safe_import("pages.crowdfunding")
+insights = safe_import("pages.insights")
+admin = safe_import("pages.admin")
+auth = safe_import("pages.auth")
+settings = safe_import("pages.settings")
 
 # App state
 class State:

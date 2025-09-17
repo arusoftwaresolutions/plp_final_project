@@ -4,7 +4,7 @@
     "builder": "NIXPACKS"
   },
   "deploy": {
-    "startCommand": "streamlit run src/app.py --server.address 0.0.0.0 --server.port $PORT",
+    "startCommand": "env PYTHONPATH=/app/src streamlit run src/app.py --server.address 0.0.0.0 --server.port $PORT",
     "healthcheckPath": "/_stcore/health",
     "healthcheckTimeout": 60
   }

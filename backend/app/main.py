@@ -25,8 +25,16 @@ except ImportError as e:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # IMPORTANT: Do not touch the database during startup so the app can become healthy fast.
-    # Any DB initialization should be triggered separately (e.g., via migrations) or via /ready checks.
+    # Optionally auto-create tables if explicitly enabled
+    try:
+        if os.getenv("AUTO_CREATE_TABLES", "false").lower() == "true":
+            print("[Startup] AUTO_CREATE_TABLES=true -> creating tables...", flush=True)
+            async with engine.begin() as conn:
+                await conn.run_sync(Base.metadata.create_all)
+            print("[Startup] Table creation completed.", flush=True)
+    except Exception as e:
+        print(f"[Startup] Skipping table creation due to error: {e}", flush=True)
+
     yield
 
 app = FastAPI(
