@@ -35,4 +35,4 @@ HEALTHCHECK --interval=10s --timeout=5s --start-period=60s --retries=10 \
   CMD curl -f http://localhost:${PORT:-8000}/live || exit 1
 
 # Command to run the application via launcher (binds to dynamic PORT if provided)
-CMD ["python", "-m", "backend.launch"]
+CMD ["python", "-m", "launch"]
