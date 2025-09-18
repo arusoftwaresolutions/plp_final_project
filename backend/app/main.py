@@ -73,8 +73,15 @@ async def lifespan(app: FastAPI):
             
             # Test DNS resolution
             try:
-                socket.getaddrinfo(db_host, db_port)
-                print("[Startup] DNS: Host resolves successfully", flush=True)
+                # Ensure port is a valid integer
+                try:
+                    port = int(db_port) if db_port and str(db_port).isdigit() else 5432
+                except (ValueError, TypeError):
+                    port = 5432  # Default PostgreSQL port if port is invalid
+                    print(f"[Startup] WARNING: Invalid port '{db_port}', using default port {port}", flush=True)
+                
+                socket.getaddrinfo(db_host, port)
+                print(f"[Startup] DNS: Host {db_host} resolves successfully on port {port}", flush=True)
             except Exception as dns_e:
                 print(f"[Startup] WARNING: DNS resolution failed for host '{db_host}': {dns_e}", flush=True)
 
