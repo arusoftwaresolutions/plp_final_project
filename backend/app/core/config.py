@@ -53,22 +53,27 @@ class Settings(BaseSettings):
     @property
     def DATABASE(self) -> str:
         """Return the asyncpg-compatible database URL."""
-        db_url = self.DATABASE_URL
+        # Get the class variable directly
+        db_url = os.getenv("DATABASE_URL") or os.getenv("RAILWAY_DATABASE_URL")
+        
         if db_url:
-            # Normalize prefix for asyncpg
+            # Normalize the URL
             if db_url.startswith("postgres://"):
                 db_url = db_url.replace("postgres://", "postgresql+asyncpg://", 1)
             elif db_url.startswith("postgresql://"):
                 db_url = db_url.replace("postgresql://", "postgresql+asyncpg://", 1)
 
-            # Ensure SSL in production
+            # Handle SSL for production
             if self.RAILWAY_ENVIRONMENT == "production":
-                parsed = urlparse(db_url)
-                query = dict(parse_qsl(parsed.query))
-                query["ssl"] = "require"
-                db_url = urlunparse(parsed._replace(query=urlencode(query)))
+                if '?' in db_url:
+                    # URL already has query parameters
+                    if 'ssl=' not in db_url and 'sslmode=' not in db_url:
+                        db_url += '&ssl=require'
+                else:
+                    # No query parameters yet
+                    db_url += '?ssl=require'
 
-            print(f"[Config] Using DATABASE_URL from environment: {db_url}", flush=True)
+            print(f"[Config] Using database URL: {db_url}", flush=True)
             return db_url
 
         # 🚨 fallback only for local/dev
