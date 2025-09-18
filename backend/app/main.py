@@ -206,60 +206,70 @@ async def lifespan(app: FastAPI):
 
     yield
 
-app = FastAPI(
-    title=settings.PROJECT_NAME,
-    description="Poverty Alleviation Platform API",
-    version=settings.VERSION,
-    openapi_url=f"{settings.API_V1_STR}/openapi.json",
-    lifespan=lifespan
-)
+def create_app():
+    """Create and configure the FastAPI application."""
+    app = FastAPI(
+        title=settings.PROJECT_NAME,
+        description="Poverty Alleviation Platform API",
+        version=settings.VERSION,
+    )
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=[str(origin) for origin in settings.BACKEND_CORS_ORIGINS],
-    allow_origin_regex=r'https?://(?:[a-z0-9-]+\.)?yourdomain\.com',
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-if os.path.isdir("static"):
-    app.mount("/static", StaticFiles(directory="static"), name="static")
-
-@app.get("/health", include_in_schema=False)
-async def health_check():
-    return {"status": "ok"}
-
-@app.get("/live", include_in_schema=False)
-async def liveness_probe():
-    return {"status": "alive"}
-
-@app.get("/ready", include_in_schema=False)
-async def readiness_probe():
+    # Import and include routers after app creation to avoid circular imports
     try:
-        async with engine.connect() as conn:
-            await conn.execute(text("SELECT 1"))
-        return {"status": "ready", "database": "connected"}
+        from backend.app.api.api_v1.api import api_router
+        app.include_router(api_router, prefix=settings.API_V1_STR)
     except Exception as e:
-        return {"status": "ready", "database": f"disconnected: {e}"}
+        print(f"[Startup] Could not import API router: {e}")
+        traceback.print_exc()
 
-@app.get("/")
-async def root():
-    return {
-        "name": settings.PROJECT_NAME,
-        "version": settings.VERSION,
-        "environment": "production" if not settings.DEBUG else "development",
-        "docs": "/docs",
-        "redoc": "/redoc",
-        "api_v1": "/api/v1"
-    }
+    # Add CORS middleware
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=settings.BACKEND_CORS_ORIGINS,
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
 
-try:
-    from backend.app.api.api_v1.api import api_router
-    app.include_router(api_router, prefix=settings.API_V1_STR)
-except Exception as e:
-    print(f"[Startup] Routers not loaded yet: {e}")
-    traceback.print_exc()
+    # Mount static files if in production
+    if settings.ENVIRONMENT == "production":
+        app.mount("/static", StaticFiles(directory="static"), name="static")
+
+    # Add startup and shutdown event handlers
+    app.router.lifespan_context = lifespan
+
+    # Add health check endpoints
+    @app.get("/health")
+    async def health_check():
+        return {"status": "healthy"}
+
+    @app.get("/liveness")
+    async def liveness_probe():
+        return {"status": "alive"}
+
+    @app.get("/readiness")
+    async def readiness_probe():
+        try:
+            async with AsyncSessionLocal() as db:
+                await db.execute(text("SELECT 1"))
+            return {"status": "ready"}
+        except Exception as e:
+            return {"status": "not ready", "error": str(e)}
+
+    @app.get("/")
+    async def root():
+        return {
+            "message": "Welcome to the Poverty Alleviation Platform API",
+            "version": settings.VERSION,
+            "environment": settings.ENVIRONMENT,
+            "docs": "/docs",
+            "redoc": "/redoc"
+        }
+    
+    return app
+
+# Create the app instance
+app = create_app()
 
 if __name__ == "__main__":
     import uvicorn

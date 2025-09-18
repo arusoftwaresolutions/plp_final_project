@@ -4,7 +4,7 @@ import logging
 from typing import AsyncGenerator, Optional
 import os
 
-from app.core.config import settings
+from backend.app.core.config import settings
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)

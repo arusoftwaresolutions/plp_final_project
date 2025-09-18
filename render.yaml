@@ -1,19 +1,18 @@
-# Render configuration for Poverty Alleviation Platform (Free Tier)
-# Free tier has limitations - no custom build/start commands
-
+# Render configuration for Poverty Alleviation Platform
 services:
   - type: web
     name: poverty-alleviation
     env: python
-    region: oregon  # Choose closest to your users
+    region: oregon
     plan: free
     
-    # Build command is automatically handled by Render
-    
-    # Start command for Render
+    # Build and install dependencies
     buildCommand: |
       pip install -e .
       pip install -r requirements.txt
+      
+    # Start command - using our app factory pattern
+    startCommand: uvicorn app:app --host 0.0.0.0 --port 10000
     
     # Environment variables
     envVars:
@@ -40,11 +39,12 @@ services:
       - key: FIRST_SUPERUSER_EMAIL
         value: admin@example.com
       - key: FIRST_SUPERUSER_PASSWORD
-        generateValue: true
+        value: "admin123"
         
       # CORS - update with your frontend URL
       - key: BACKEND_CORS_ORIGINS
         value: '["http://localhost:3000"]'
+
 
 # Database configuration
 databases:
