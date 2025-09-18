@@ -1,4 +1,5 @@
-from pydantic import AnyHttpUrl, EmailStr, BaseSettings, validator
+from pydantic import AnyHttpUrl, EmailStr, validator
+from pydantic_settings import BaseSettings
 from typing import List, Optional, Union
 import os
 from dotenv import load_dotenv
