@@ -31,8 +31,7 @@ pytest==7.4.4
 pytest-asyncio==0.23.5
 httpx==0.26.0
 
-# CORS
-starlette==0.36.3
+# CORS (version managed by FastAPI)
 
 # Logging
 structlog==24.1.0
