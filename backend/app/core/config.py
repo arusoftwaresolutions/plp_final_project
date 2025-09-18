@@ -1,19 +1,22 @@
 from pydantic import AnyHttpUrl, EmailStr, BaseSettings, validator
-from typing import List, Optional, Union, Any
+from typing import List, Optional, Union
 import os
 from dotenv import load_dotenv
 from urllib.parse import urlparse, urlunparse, parse_qsl, urlencode
 
-# Load .env only in local dev
+# Load .env in dev mode only
 _ENV = os.getenv("ENVIRONMENT", "production").lower()
 if _ENV in ("dev", "development", "local"):
     load_dotenv(override=True)
+
+# Debug print to confirm Railway variable injection
+print("DEBUG: DATABASE_URL in os.environ =", os.getenv("DATABASE_URL"), flush=True)
 
 class Settings(BaseSettings):
     # Project
     PROJECT_NAME: str = os.getenv("BACKEND_APP_NAME", "Poverty Alleviation Platform")
     VERSION: str = os.getenv("BACKEND_APP_VERSION", "1.0.0")
-    DEBUG: bool = os.getenv("BACKEND_DEBUG", False)
+    DEBUG: bool = bool(os.getenv("BACKEND_DEBUG", False))
     ENVIRONMENT: str = os.getenv("ENVIRONMENT", "production")
     API_V1_STR: str = "/api/v1"
 
@@ -29,15 +32,18 @@ class Settings(BaseSettings):
     def assemble_cors_origins(cls, v: Union[str, List[str]]) -> List[str]:
         if isinstance(v, str) and not v.startswith("["):
             v = [i.strip() for i in v.split(",")]
-        return v or ["http://localhost:8501", "http://localhost:3000"]
+        if not v:
+            return ["http://localhost:8501", "http://localhost:3000"]
+        return v
 
-    # Railway environment
+    # Railway env
     RAILWAY_ENVIRONMENT: str = os.getenv("RAILWAY_ENVIRONMENT", "production").lower()
     RAILWAY_SERVICE_NAME: Optional[str] = os.getenv("RAILWAY_SERVICE_NAME")
 
-    # Database URL
+    # Database URLs
     DATABASE_URL: Optional[str] = os.getenv("DATABASE_URL") or os.getenv("RAILWAY_DATABASE_URL")
 
+    # Fallback DB config (used only if DATABASE_URL not found)
     POSTGRES_SERVER: str = os.getenv("PGHOST") or os.getenv("POSTGRES_HOSTNAME") or "db"
     POSTGRES_USER: str = os.getenv("PGUSER") or os.getenv("POSTGRES_USER") or "postgres"
     POSTGRES_PASSWORD: str = os.getenv("PGPASSWORD") or os.getenv("POSTGRES_PASSWORD") or ""
@@ -46,35 +52,49 @@ class Settings(BaseSettings):
 
     @property
     def DATABASE(self) -> str:
-        """Return the database URL formatted for asyncpg."""
+        """Return the asyncpg-compatible database URL."""
         db_url = self.DATABASE_URL
         if db_url:
-            # Normalize prefix
+            # Normalize prefix for asyncpg
             if db_url.startswith("postgres://"):
                 db_url = db_url.replace("postgres://", "postgresql+asyncpg://", 1)
             elif db_url.startswith("postgresql://"):
                 db_url = db_url.replace("postgresql://", "postgresql+asyncpg://", 1)
 
-            # Force SSL for Railway
+            # Ensure SSL in production
             if self.RAILWAY_ENVIRONMENT == "production":
                 parsed = urlparse(db_url)
                 query = dict(parse_qsl(parsed.query))
                 query["ssl"] = "require"
                 db_url = urlunparse(parsed._replace(query=urlencode(query)))
+
+            print(f"[Config] Using DATABASE_URL from environment: {db_url}", flush=True)
             return db_url
 
-        # Fallback (local dev)
-        credentials = f"{self.POSTGRES_USER}"
+        # 🚨 fallback only for local/dev
+        fallback = f"postgresql+asyncpg://{self.POSTGRES_USER}"
         if self.POSTGRES_PASSWORD:
-            credentials = f"{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}"
-        db_url = f"postgresql+asyncpg://{credentials}@{self.POSTGRES_SERVER}:{self.POSTGRES_PORT}/{self.POSTGRES_DB}"
+            fallback += f":{self.POSTGRES_PASSWORD}"
+        fallback += f"@{self.POSTGRES_SERVER}:{self.POSTGRES_PORT}/{self.POSTGRES_DB}"
+
         if self.RAILWAY_ENVIRONMENT == "production":
-            db_url += "?ssl=require"
-        return db_url
+            fallback += "?ssl=require"
+
+        print(f"[Config] Falling back to built DB URL: {fallback}", flush=True)
+        return fallback
 
     @property
     def SYNC_DATABASE_URL(self) -> str:
+        """Return sync DB URL (for migrations)."""
         return self.DATABASE.replace("postgresql+asyncpg://", "postgresql://")
+
+    # Admin
+    FIRST_SUPERUSER: str = os.getenv("FIRST_SUPERUSER", "admin")
+    FIRST_SUPERUSER_EMAIL: EmailStr = os.getenv("FIRST_SUPERUSER_EMAIL", "admin@example.com")
+    FIRST_SUPERUSER_PASSWORD: str = os.getenv("FIRST_SUPERUSER_PASSWORD", "admin123")
+
+    # AI Settings
+    AI_MODEL_PATH: str = os.getenv("AI_MODEL_PATH", "models/budget_recommender.joblib")
 
     class Config:
         case_sensitive = True
