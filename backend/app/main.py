@@ -31,11 +31,34 @@ except ImportError as e:
     print(f"Python path: {sys.path}")
     raise
 
-# Safe int parser to avoid Railway ***** issues
+# Safe int parser to handle Railway's masked values and other edge cases
 def safe_int(val: Optional[str], default: int) -> int:
+    """Safely convert a string to an integer, handling various edge cases.
+    
+    Args:
+        val: The value to convert to an integer. Can be None or any string.
+        default: The default value to return if conversion fails.
+        
+    Returns:
+        The converted integer, or the default value if conversion fails.
+    """
+    if val is None:
+        return default
+        
+    # Handle masked values (Railway masks sensitive values with '*****')
+    if isinstance(val, str) and '*****' in val:
+        print(f"[WARNING] Attempted to convert masked value to int: {val}")
+        return default
+        
     try:
-        return int(val)
-    except (TypeError, ValueError):
+        # Remove any non-numeric characters except minus sign
+        if isinstance(val, str):
+            cleaned = ''.join(c for c in val if c.isdigit() or c == '-')
+            if cleaned and cleaned != '-':  # Ensure we have at least one digit
+                return int(cleaned)
+        return default
+    except (TypeError, ValueError) as e:
+        print(f"[WARNING] Failed to convert {val} to int: {e}")
         return default
 
 @asynccontextmanager
@@ -240,10 +263,22 @@ except Exception as e:
 
 if __name__ == "__main__":
     import uvicorn
+    
+    # Get the port from environment variable with fallback
+    port_env = os.getenv("PORT")
+    port = safe_int(port_env, 8000)
+    
+    # Additional fallback if we still don't have a valid port
+    if not isinstance(port, int) or port <= 0 or port > 65535:
+        print(f"[WARNING] Invalid port {port_env}, defaulting to 8000")
+        port = 8000
+    
+    print(f"[Startup] Starting server on port {port}")
+    
     uvicorn.run(
         "app.main:app",
         host="0.0.0.0",
-        port=safe_int(os.getenv("PORT"), 8000),
+        port=port,
         reload=True,
         reload_dirs=["app"],
         log_level="info"
