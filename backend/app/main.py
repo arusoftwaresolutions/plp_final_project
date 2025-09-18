@@ -68,8 +68,108 @@ async def lifespan(app: FastAPI):
             await conn.run_sync(Base.metadata.create_all)
         print("[Startup] Tables ensured.", flush=True)
 
-        # Run seeding logic (admin user, roles, demo campaign, etc.)
-        # … (kept same as your original logic) …
+        # ----------------------------------------------------------------
+        # Seeding logic (admin, roles, demo data)
+        # ----------------------------------------------------------------
+        async with AsyncSessionLocal() as db:
+            # Admin role
+            result = await db.execute(select(Role).where(Role.name == "admin"))
+            admin_role = result.scalar_one_or_none()
+            if not admin_role:
+                admin_role = Role(name="admin", description="Administrator")
+                db.add(admin_role)
+                await db.flush()
+
+            # Admin user
+            result = await db.execute(select(User).where(User.email == settings.FIRST_SUPERUSER_EMAIL))
+            admin_user = result.scalar_one_or_none()
+            if not admin_user:
+                admin_user = User(
+                    username=settings.FIRST_SUPERUSER,
+                    email=settings.FIRST_SUPERUSER_EMAIL,
+                    hashed_password=get_password_hash(settings.FIRST_SUPERUSER_PASSWORD),
+                    is_active=True,
+                    is_verified=True,
+                )
+                db.add(admin_user)
+                await db.flush()
+
+            if admin_role not in (admin_user.roles or []):
+                if not admin_user.roles:
+                    admin_user.roles = []
+                admin_user.roles.append(admin_role)
+
+            await db.commit()
+            print("[Startup] Admin user and role ensured.", flush=True)
+
+            # Core roles
+            sample_roles = [("user", "Standard user"), ("donor", "Donor user")]
+            existing_roles = {r.name for r in (await db.execute(select(Role))).scalars().all()}
+            for name, desc in sample_roles:
+                if name not in existing_roles:
+                    db.add(Role(name=name, description=desc))
+            await db.flush()
+            roles_map = {r.name: r for r in (await db.execute(select(Role))).scalars().all()}
+
+            # Sample users
+            default_pwd = "SamplePass123!"
+            sample_users = [
+                {"username": "john", "email": "john@example.com", "roles": ["user"]},
+                {"username": "sara", "email": "sara@example.com", "roles": ["user"]},
+                {"username": "dana", "email": "dana.donor@example.com", "roles": ["donor"]},
+                {"username": "peter", "email": "peter.donor@example.com", "roles": ["donor"]},
+            ]
+            created_users = {}
+            for u in sample_users:
+                result = await db.execute(select(User).where(User.email == u["email"]))
+                user_obj = result.scalar_one_or_none()
+                if not user_obj:
+                    user_obj = User(
+                        username=u["username"],
+                        email=u["email"],
+                        hashed_password=get_password_hash(default_pwd),
+                        is_active=True,
+                        is_verified=True,
+                    )
+                    db.add(user_obj)
+                    await db.flush()
+                if not user_obj.roles:
+                    user_obj.roles = []
+                for rn in u["roles"]:
+                    role_obj = roles_map.get(rn)
+                    if role_obj and role_obj not in user_obj.roles:
+                        user_obj.roles.append(role_obj)
+                created_users[u["username"]] = user_obj
+            await db.flush()
+
+            # Demo crowdfunding campaign
+            result = await db.execute(select(CrowdFundingCampaign))
+            if result.scalars().first() is None:
+                demo_campaign = CrowdFundingCampaign(
+                    title="Clean Water for Village X",
+                    description="Provide clean water access by building a well and filtration system.",
+                    target_amount=5000.0,
+                    amount_raised=0.0,
+                    end_date=datetime.utcnow() + timedelta(days=30),
+                    status="active",
+                    location={"lat": 9.03, "lng": 38.74, "address": "Village X"},
+                    created_by=created_users.get("john").id
+                )
+                db.add(demo_campaign)
+                await db.flush()
+                for donor_username, amount in [("dana", 100.0), ("peter", 250.0)]:
+                    donor_user = created_users.get(donor_username)
+                    if donor_user:
+                        db.add(Donation(
+                            campaign_id=demo_campaign.id,
+                            donor_id=donor_user.id,
+                            amount=amount,
+                            message=f"Support from {donor_username}",
+                            is_anonymous=False,
+                        ))
+                await db.flush()
+            await db.commit()
+            print("[Startup] Sample data ensured.", flush=True)
 
     except Exception as e:
         print(f"[Startup] Initialization error: {e}", flush=True)
@@ -123,6 +223,9 @@ async def readiness_probe():
     except Exception as e:
         return {"status": "not ready", "database": f"disconnected: {e}"}
 
+# --------------------------------------------------------------------
+# Root
+# --------------------------------------------------------------------
 @app.get("/")
 async def root():
     return {
@@ -134,6 +237,9 @@ async def root():
         "api_v1": "/api/v1"
     }
 
+# --------------------------------------------------------------------
+# Router
+# --------------------------------------------------------------------
 try:
     from app.api.api_v1.api import api_router
     app.include_router(api_router, prefix=settings.API_V1_STR)
