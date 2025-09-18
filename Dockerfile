@@ -3,10 +3,8 @@ FROM python:3.9-slim
 # Set environment variables
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
+    PORT=8000 \
     PYTHONPATH=/app
-
-# Railway will inject PORT dynamically
-ENV PORT=8000
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -29,9 +27,12 @@ COPY backend/ .
 # Install the package in development mode
 RUN pip install -e .
 
-# Expose the port (Railway overrides with $PORT)
+# Expose the port the app runs on
 EXPOSE 8000
 
-# Simple health check (inside container, for Docker)
+# Simple health check
 HEALTHCHECK --interval=10s --timeout=5s --start-period=60s --retries=10 \
-  CMD curl -f http://localhost:${PORT:-8000}/health || exit 1
+  CMD curl -f http://localhost:${PORT:-8000}/live || exit 1
+
+# Command to run the application via launcher (binds to dynamic PORT if provided)
+CMD ["python", "-m", "launch"]
