@@ -2,51 +2,126 @@
 
 A comprehensive platform for poverty alleviation, aligned with SDG 1: No Poverty. This application provides financial literacy, microloans, and crowdfunding capabilities to help combat poverty.
 
-[![Deploy on Railway](https://railway.app/button.svg)](https://railway.app/new/template?template=)
-
 ## Features
 
-- **Modern Web Interface**: Responsive design built with Streamlit
+- **RESTful API**: Built with FastAPI
 - **User Authentication**: Secure login with JWT
-- **Financial Dashboard**: Track income, expenses, and financial health
+- **Financial Management**: Track transactions and financial health
 - **Microloans**: Apply for and manage microloans
 - **Crowdfunding**: Create and support poverty alleviation campaigns
-- **AI-Powered Insights**: Get personalized financial recommendations
 - **Admin Dashboard**: Manage users, loans, and campaigns
-- **Geospatial Visualization**: Interactive maps showing poverty-affected areas
 
 ## Tech Stack
 
 - **Backend**: FastAPI (Python 3.9+)
-- **Frontend**: Streamlit
 - **Database**: PostgreSQL
 - **Authentication**: JWT (JSON Web Tokens)
-- **Containerization**: Docker & Docker Compose
-- **Deployment**: Railway
-- **CI/CD**: GitHub Actions
-
-## Prerequisites
-
-- Python 3.9+
-- Docker and Docker Compose
-- PostgreSQL 14+
-- Node.js 16+ (for frontend development)
-- Git
-
-## Setup
-
-1. Clone the repository
-2. Install dependencies: `pip install -r requirements.txt`
-3. Set up environment variables (copy `.env.example` to `.env` and configure)
-4. Run migrations: `alembic upgrade head`
-5. Start the application: `docker-compose up --build`
-
-## Default Admin Credentials
-
-- Username: admin
-- Password: admin123
+- **Deployment**: Render
+- **API Documentation**: Auto-generated with Swagger UI and ReDoc
 
 ## Project Structure
+
+```
+SDG!
+├── app.py                  # Main application entry point
+├── requirements.txt        # Python dependencies
+├── render.yaml             # Render deployment configuration
+├── .gitignore             # Git ignore file
+└── backend/               # Main application package
+    ├── app/
+    │   ├── __init__.py
+    │   ├── main.py        # FastAPI application setup
+    │   ├── core/          # Core functionality
+    │   │   ├── config.py  # Application configuration
+    │   │   └── security.py # Authentication utilities
+    │   ├── db/           # Database models and session
+    │   │   ├── models.py  # SQLAlchemy models
+    │   │   └── session.py # Database session management
+    │   └── api/          # API routes
+    │       └── v1/        # API version 1
+    │           └── endpoints/  # API endpoints
+    └── tests/             # Test files
+```
+
+## Local Development
+
+### Prerequisites
+- Python 3.9+
+- PostgreSQL
+- Git
+
+### Setup
+
+1. Clone the repository:
+   ```bash
+   git clone <repository-url>
+   cd SDG!
+   ```
+
+2. Create a virtual environment:
+   ```bash
+   python -m venv venv
+   source venv/bin/activate  # On Windows: .\venv\Scripts\activate
+   ```
+
+3. Install dependencies:
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+4. Set up environment variables:
+   - Copy `.env.example` to `.env`
+   - Update the variables in `.env` with your local configuration
+
+5. Run the application:
+   ```bash
+   uvicorn app:app --reload
+   ```
+
+6. Access the API documentation:
+   - Swagger UI: http://localhost:8000/docs
+   - ReDoc: http://localhost:8000/redoc
+
+## Deployment
+
+### Render Deployment
+
+1. Push your code to a GitHub repository
+2. Connect the repository to Render
+3. Configure environment variables in the Render dashboard
+4. Set the following build command:
+   ```
+   pip install -r requirements.txt
+   ```
+5. Set the start command:
+   ```
+   uvicorn backend.app.main:app --host 0.0.0.0 --port 10000
+   ```
+
+### Required Environment Variables
+
+- `DATABASE_URL`: PostgreSQL connection string
+- `SECRET_KEY`: Secret key for JWT token generation
+- `ALGORITHM`: Hashing algorithm (default: HS256)
+- `ACCESS_TOKEN_EXPIRE_MINUTES`: Token expiration time (default: 30)
+- `ENVIRONMENT`: Set to 'production' in production
+
+## API Documentation
+
+Once the application is running, access the interactive API documentation at:
+- Swagger UI: `/docs`
+- ReDoc: `/redoc`
+
+## Contributing
+
+1. Fork the repository
+2. Create a new branch
+3. Make your changes
+4. Submit a pull request
+
+## License
+
+This project is licensed under the MIT License.
 
 ```
 SDG!/

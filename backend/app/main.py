@@ -17,10 +17,10 @@ if _ENV in ("dev", "development", "local"):
 
 # Local imports
 try:
-    from app.core.config import settings
-    from app.db.session import engine, Base, AsyncSessionLocal
-    from app.core.security import get_password_hash
-    from app.db.models import (
+    from backend.app.core.config import settings
+    from backend.app.db.session import engine, Base, AsyncSessionLocal
+    from backend.app.core.security import get_password_hash
+    from backend.app.db.models import (
         User, Role, Transaction, TransactionType, TransactionCategory,
         MicroLoan, CrowdFundingCampaign, Donation, PovertyArea,
         Notification, NotificationType
@@ -255,7 +255,7 @@ async def root():
     }
 
 try:
-    from app.api.api_v1.api import api_router
+    from backend.app.api.api_v1.api import api_router
     app.include_router(api_router, prefix=settings.API_V1_STR)
 except Exception as e:
     print(f"[Startup] Routers not loaded yet: {e}")

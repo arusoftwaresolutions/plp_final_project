@@ -8,8 +8,12 @@ services:
     region: oregon  # Choose closest to your users
     plan: free
     
-    # Free tier doesn't allow custom build/start commands
-    # It will automatically install requirements.txt and look for app.py or main.py
+    # Build command is automatically handled by Render
+    
+    # Start command for Render
+    buildCommand: |
+      pip install -e .
+      pip install -r requirements.txt
     
     # Environment variables
     envVars:
