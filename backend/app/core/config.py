@@ -40,53 +40,36 @@ class Settings(BaseSettings):
     RAILWAY_ENVIRONMENT: str = os.getenv("RAILWAY_ENVIRONMENT", "production").lower()
     RAILWAY_SERVICE_NAME: Optional[str] = os.getenv("RAILWAY_SERVICE_NAME")
 
-    # Database URLs
+    # Database Configuration
+    # Prefer DATABASE_URL or RAILWAY_DATABASE_URL environment variable
     DATABASE_URL: Optional[str] = os.getenv("DATABASE_URL") or os.getenv("RAILWAY_DATABASE_URL")
-
-    # Fallback DB config (used only if DATABASE_URL not found)
-    POSTGRES_SERVER: str = os.getenv("PGHOST") or os.getenv("POSTGRES_HOSTNAME") or "db"
-    POSTGRES_USER: str = os.getenv("PGUSER") or os.getenv("POSTGRES_USER") or "postgres"
-    POSTGRES_PASSWORD: str = os.getenv("PGPASSWORD") or os.getenv("POSTGRES_PASSWORD") or ""
-    POSTGRES_DB: str = os.getenv("PGDATABASE") or os.getenv("POSTGRES_DB") or "railway"
-    POSTGRES_PORT: str = str(os.getenv("PGPORT") or os.getenv("POSTGRES_PORT") or "5432")
+    
+    # Development defaults (only used if no DATABASE_URL is provided)
+    DEV_DATABASE_URL: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/railway"
 
     @property
     def DATABASE(self) -> str:
         """Return the asyncpg-compatible database URL."""
-        # Get the class variable directly
-        db_url = os.getenv("DATABASE_URL") or os.getenv("RAILWAY_DATABASE_URL")
-        
-        if db_url:
+        # Use DATABASE_URL if available
+        if self.DATABASE_URL:
+            db_url = self.DATABASE_URL
+            
             # Normalize the URL
             if db_url.startswith("postgres://"):
                 db_url = db_url.replace("postgres://", "postgresql+asyncpg://", 1)
-            elif db_url.startswith("postgresql://"):
+            elif not db_url.startswith("postgresql+asyncpg://"):
                 db_url = db_url.replace("postgresql://", "postgresql+asyncpg://", 1)
 
             # Handle SSL for production
-            if self.RAILWAY_ENVIRONMENT == "production":
-                if '?' in db_url:
-                    # URL already has query parameters
-                    if 'ssl=' not in db_url and 'sslmode=' not in db_url:
-                        db_url += '&ssl=require'
-                else:
-                    # No query parameters yet
-                    db_url += '?ssl=require'
+            if self.RAILWAY_ENVIRONMENT == "production" and 'ssl=' not in db_url and 'sslmode=' not in db_url:
+                db_url += '?ssl=require' if '?' not in db_url else '&ssl=require'
 
             print(f"[Config] Using database URL: {db_url}", flush=True)
             return db_url
-
-        # 🚨 fallback only for local/dev
-        fallback = f"postgresql+asyncpg://{self.POSTGRES_USER}"
-        if self.POSTGRES_PASSWORD:
-            fallback += f":{self.POSTGRES_PASSWORD}"
-        fallback += f"@{self.POSTGRES_SERVER}:{self.POSTGRES_PORT}/{self.POSTGRES_DB}"
-
-        if self.RAILWAY_ENVIRONMENT == "production":
-            fallback += "?ssl=require"
-
-        print(f"[Config] Falling back to built DB URL: {fallback}", flush=True)
-        return fallback
+            
+        # Fallback to development database
+        print("[Config] Using development database URL", flush=True)
+        return self.DEV_DATABASE_URL
 
     @property
     def SYNC_DATABASE_URL(self) -> str:
