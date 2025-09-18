@@ -1,36 +1,17 @@
-"""
-Main application module for the Poverty Alleviation Platform.
-This module contains the FastAPI application and database initialization code.
-"""
-import os
-import sys
-from pathlib import Path
-from contextlib import asynccontextmanager
-from datetime import datetime, timedelta
-from typing import Optional
-from fastapi import FastAPI, Request
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
-from sqlalchemy import select
-import traceback
-from dotenv import load_dotenv
 
-# Add the project root to the Python path
-sys.path.append(str(Path(__file__).parent.parent.parent))
+# Create app first
+app = FastAPI(title="Poverty Alleviation Platform API")
 
-# Load environment variables in development
-_ENV = os.getenv("ENVIRONMENT", "production").lower()
-if _ENV in ("dev", "development", "local"):
-    load_dotenv(override=True)
-
-# Local imports
-from backend.app.core.config import settings
-from backend.app.db.session import engine, Base, AsyncSessionLocal
-from backend.app.core.security import get_password_hash
-from backend.app.api.api_v1.api import api_router
-
-# Import models to register them with SQLAlchemy
-from backend.app.db.models import *  # noqa
+# Add CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # Safe int parser to handle masked values and other edge cases
 def safe_int(val: Optional[str], default: int) -> int:
@@ -162,63 +143,46 @@ app = FastAPI(
     description="API for the Poverty Alleviation Platform",
     version="1.0.0",
     docs_url="/docs",
-    redoc_url="/redoc",
-    lifespan=lifespan
+    redoc_url="/redoc"
 )
 
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.BACKEND_CORS_ORIGINS,
+    allow_origins=["*"],  # Allow all origins for now, can be restricted later
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Include API router
+# Import and include API router after app creation to avoid circular imports
+from backend.app.api.api_v1.api import api_router
+app.include_router(api_router, prefix=settings.API_V1_STR)
+
+# Import and include API router after app creation
+from backend.app.api.api_v1.api import api_router
+from backend.app.core.config import settings
 app.include_router(api_router, prefix=settings.API_V1_STR)
 
 # Health check endpoint
-@app.get("/health", tags=["health"])
+@app.get("/health")
 async def health_check():
-    """Health check endpoint for monitoring."""
+    from backend.app.core.config import settings
     return {
-        "status": "healthy",
+        "status": "ok",
         "version": "1.0.0",
         "environment": settings.ENVIRONMENT
     }
 
-# Root endpoint
-@app.get("/", tags=["root"])
-async def root():
-    """Root endpoint with API information."""
-    return {
-        "message": "Welcome to the Poverty Alleviation Platform API",
-        "version": "1.0.0",
-        "environment": settings.ENVIRONMENT,
-        "docs": "/docs",
-        "redoc": "/redoc"
-    }
-
-# Exception handler
-@app.exception_handler(Exception)
-async def global_exception_handler(request: Request, exc: Exception):
-    """Global exception handler."""
-    return JSONResponse(
-        status_code=500,
-        content={"detail": "Internal server error"},
-    )
+# Initialize database on startup
+@app.on_event("startup")
+async def startup_event():
+    from backend.app.db.session import engine, Base
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+    print("Database initialized")
 
 # This allows running with `python -m backend.app.main` for local development
 if __name__ == "__main__":
     import uvicorn
-    
-    # Get the port from environment variable with fallback
-    port = int(os.getenv("PORT", 8000))
-    
-    uvicorn.run(
-        "backend.app.main:app",
-        host="0.0.0.0",
-        port=port,
-        reload=settings.ENVIRONMENT != "production"
-    )
+    uvicorn.run("backend.app.main:app", host="0.0.0.0", port=8000, reload=True)
