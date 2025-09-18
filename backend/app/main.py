@@ -7,7 +7,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import text, select
 from sqlalchemy.engine.url import make_url
-import socket
 import traceback
 from dotenv import load_dotenv
 
@@ -47,25 +46,17 @@ async def lifespan(app: FastAPI):
             print(f"  {key}: {value}", flush=True)
 
     try:
-        # Get the database URL from settings (already handles Railway's environment variables)
         db_url = settings.DATABASE
-        
-        # Print a redacted version of the URL for security
         if db_url and '@' in db_url:
-            # Redact password in logs
             parts = db_url.split('@')
             redacted_url = f"{parts[0].split('://')[0]}://*****:*****@{'@'.join(parts[1:])}"
             print(f"[Startup] Using database URL: {redacted_url}", flush=True)
         else:
             print(f"[Startup] Using database URL: {db_url}", flush=True)
 
-        # Skip DNS resolution and direct connection test since the engine will handle this
-        print("[Startup] Database configuration loaded successfully", flush=True)
-
         # Test database connection with retry logic
         max_retries = 3
-        retry_delay = 2  # seconds
-        
+        retry_delay = 2
         for attempt in range(max_retries):
             try:
                 print(f"[Startup] Testing database connection (attempt {attempt + 1}/{max_retries})...", flush=True)
@@ -73,26 +64,20 @@ async def lifespan(app: FastAPI):
                     result = await conn.execute(text("SELECT version()"))
                     version = result.scalar()
                     print(f"[Startup] Successfully connected to database. Version: {version}", flush=True)
-                    break  # Connection successful, exit retry loop
+                    break
             except Exception as db_error:
-                if attempt == max_retries - 1:  # Last attempt
+                if attempt == max_retries - 1:
                     print(f"[Startup] ERROR: Failed to connect to database after {max_retries} attempts", flush=True)
                     print(f"[Startup] Connection error: {str(db_error)}", flush=True)
-                    print("[Startup] Please check your database configuration and ensure the database is accessible", flush=True)
                     raise
                 print(f"[Startup] WARNING: Database connection attempt {attempt + 1} failed: {db_error}", flush=True)
                 import time
                 time.sleep(retry_delay)
-        
+
         # Create tables
-        try:
-            print("[Startup] Creating database tables if not exist...", flush=True)
-            async with engine.begin() as conn:
-                await conn.run_sync(Base.metadata.create_all)
-            print("[Startup] Tables are ready.", flush=True)
-        except Exception as e:
-            print(f"[Startup] WARNING: Error creating tables: {e}", flush=True)
-            print("[Startup] Continuing startup...", flush=True)
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+        print("[Startup] Tables are ready.", flush=True)
 
         # Seed admin role and user
         async with AsyncSessionLocal() as db:
@@ -124,18 +109,15 @@ async def lifespan(app: FastAPI):
             await db.commit()
             print("[Startup] Admin user and role are ensured.", flush=True)
 
-            # Seed core roles and sample data
-            print("[Startup] Ensuring core roles and sample data...", flush=True)
+            # Seed core roles and sample users
             sample_roles = [("user", "Standard user"), ("donor", "Donor user")]
             existing_roles = {r.name for r in (await db.execute(select(Role))).scalars().all()}
             for name, desc in sample_roles:
                 if name not in existing_roles:
                     db.add(Role(name=name, description=desc))
             await db.flush()
-
             roles_map = {r.name: r for r in (await db.execute(select(Role))).scalars().all()}
 
-            # Sample users
             default_pwd = "SamplePass123!"
             sample_users = [
                 {"username": "john", "email": "john@example.com", "roles": ["user"]},
@@ -143,7 +125,6 @@ async def lifespan(app: FastAPI):
                 {"username": "dana", "email": "dana.donor@example.com", "roles": ["donor"]},
                 {"username": "peter", "email": "peter.donor@example.com", "roles": ["donor"]},
             ]
-
             created_users = {}
             for u in sample_users:
                 result = await db.execute(select(User).where(User.email == u["email"]))
@@ -193,7 +174,6 @@ async def lifespan(app: FastAPI):
                             is_anonymous=False,
                         ))
                 await db.flush()
-
             await db.commit()
             print("[Startup] Sample data ensured.", flush=True)
 
@@ -211,7 +191,6 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# Configure CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[str(origin) for origin in settings.BACKEND_CORS_ORIGINS],
@@ -221,11 +200,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Mount static files
 if os.path.isdir("static"):
     app.mount("/static", StaticFiles(directory="static"), name="static")
 
-# Health, liveness, readiness endpoints
 @app.get("/health", include_in_schema=False)
 async def health_check():
     return {"status": "ok"}
@@ -243,7 +220,6 @@ async def readiness_probe():
     except Exception as e:
         return {"status": "ready", "database": f"disconnected: {e}"}
 
-# Root endpoint
 @app.get("/")
 async def root():
     return {
@@ -255,7 +231,6 @@ async def root():
         "api_v1": "/api/v1"
     }
 
-# Include API router
 try:
     from app.api.api_v1.api import api_router
     app.include_router(api_router, prefix=settings.API_V1_STR)
@@ -268,7 +243,7 @@ if __name__ == "__main__":
     uvicorn.run(
         "app.main:app",
         host="0.0.0.0",
-        port=int(os.getenv("PORT", "8000")),
+        port=safe_int(os.getenv("PORT"), 8000),
         reload=True,
         reload_dirs=["app"],
         log_level="info"
