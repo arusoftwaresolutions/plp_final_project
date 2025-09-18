@@ -1,8 +1,8 @@
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 from sqlalchemy.orm import declarative_base
 import logging
-import os
 from typing import AsyncGenerator, Optional
+import os
 
 from app.core.config import settings
 
@@ -10,41 +10,10 @@ from app.core.config import settings
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-def get_database_url() -> str:
-    """Get the database URL, handling Railway's masking of sensitive information."""
-    # Get the URL from settings
-    db_url = settings.DATABASE
-    
-    # If the URL is masked (contains '*****'), try to construct it from individual components
-    if '*****' in db_url:
-        logger.warning("Detected masked database URL, trying to construct from environment variables")
-        
-        # Get individual components from environment variables
-        db_host = os.getenv("PGHOST")
-        db_port = os.getenv("PGPORT")
-        db_user = os.getenv("PGUSER")
-        db_password = os.getenv("PGPASSWORD")
-        db_name = os.getenv("PGDATABASE")
-        
-        if all([db_host, db_port, db_user, db_password, db_name]):
-            # Construct the URL from individual components
-            db_url = f"postgresql+asyncpg://{db_user}:{db_password}@{db_host}:{db_port}/{db_name}"
-            
-            # Add SSL if in production
-            if settings.RAILWAY_ENVIRONMENT == "production":
-                db_url += "?sslmode=require"
-            
-            logger.info("Successfully constructed database URL from environment variables")
-            return db_url
-        else:
-            raise ValueError("Database URL is masked and required environment variables are missing")
-    
-    return db_url
-
 def create_db_engine():
     """Create and return an async database engine with proper configuration."""
     try:
-        db_url = get_database_url()
+        db_url = settings.DATABASE
         
         # Redact password in logs
         if "@" in db_url:
@@ -54,15 +23,18 @@ def create_db_engine():
         else:
             logger.info(f"Connecting to database: {db_url}")
 
+        # Configure connection pool and timeouts
         engine = create_async_engine(
             db_url,
             echo=settings.DEBUG,
-            pool_pre_ping=True,
-            pool_recycle=300,
-            pool_size=5,
-            max_overflow=10,
-            connect_args={"ssl": "require"} if settings.RAILWAY_ENVIRONMENT == "production" else {}
+            pool_pre_ping=True,  # Verify connections before using them
+            pool_recycle=300,    # Recycle connections after 5 minutes
+            pool_size=5,         # Number of connections to keep open
+            max_overflow=10,     # Max number of connections to create beyond pool_size
+            pool_timeout=30,     # Max seconds to wait for a connection
+            connect_args={"connect_timeout": 10}  # Connection timeout in seconds
         )
+        
         logger.info("Database engine created successfully")
         return engine
     except Exception as e:
