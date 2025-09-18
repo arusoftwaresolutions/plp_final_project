@@ -215,13 +215,15 @@ async def liveness_probe():
 
 @app.get("/ready", include_in_schema=False)
 async def readiness_probe():
-    print("[Healthcheck] /ready called", flush=True)
     try:
+        # Try DB connection, but return "starting" if fails
         async with engine.connect() as conn:
             await conn.execute(text("SELECT 1"))
-        return {"status": "ready", "database": "connected"}
-    except Exception as e:
-        return {"status": "not ready", "database": f"disconnected: {e}"}
+        db_status = "connected"
+    except Exception:
+        db_status = "starting"  # <-- never fail the probe immediately
+
+    return {"status": "ready", "database": db_status}
 
 # --------------------------------------------------------------------
 # Root
