@@ -50,25 +50,55 @@ class Settings(BaseSettings):
     @property
     def DATABASE(self) -> str:
         """Return the asyncpg-compatible database URL."""
-        # Use DATABASE_URL if available
-        if self.DATABASE_URL:
-            db_url = self.DATABASE_URL
+        # Use DATABASE_URL if available and not masked by Railway
+        if self.DATABASE_URL and '*****' not in self.DATABASE_URL:
+            try:
+                db_url = self.DATABASE_URL
+                
+                # Normalize the URL
+                if db_url.startswith("postgres://"):
+                    db_url = db_url.replace("postgres://", "postgresql+asyncpg://", 1)
+                elif not db_url.startswith("postgresql+asyncpg://"):
+                    db_url = db_url.replace("postgresql://", "postgresql+asyncpg://", 1)
+
+                # Handle SSL for production
+                if self.RAILWAY_ENVIRONMENT == "production" and 'ssl=' not in db_url and 'sslmode=' not in db_url:
+                    db_url += '?ssl=require' if '?' not in db_url else '&ssl=require'
+
+                # Redact password in logs
+                if '@' in db_url:
+                    parts = db_url.split('@')
+                    redacted_url = f"{parts[0].split('://')[0]}://*****:*****@{'@'.join(parts[1:])}"
+                    print(f"[Config] Using database URL: {redacted_url}", flush=True)
+                else:
+                    print(f"[Config] Using database URL: {db_url}", flush=True)
+                
+                return db_url
+            except Exception as e:
+                print(f"[Config] Error processing DATABASE_URL: {e}", flush=True)
+        
+        # Check for individual components if DATABASE_URL is masked or not available
+        try:
+            db_host = os.getenv("PGHOST") or "localhost"
+            db_port = os.getenv("PGPORT") or "5432"
+            db_user = os.getenv("PGUSER") or "postgres"
+            db_password = os.getenv("PGPASSWORD") or "postgres"
+            db_name = os.getenv("PGDATABASE") or "railway"
             
-            # Normalize the URL
-            if db_url.startswith("postgres://"):
-                db_url = db_url.replace("postgres://", "postgresql+asyncpg://", 1)
-            elif not db_url.startswith("postgresql+asyncpg://"):
-                db_url = db_url.replace("postgresql://", "postgresql+asyncpg://", 1)
-
+            db_url = f"postgresql+asyncpg://{db_user}:{db_password}@{db_host}:{db_port}/{db_name}"
+            
             # Handle SSL for production
-            if self.RAILWAY_ENVIRONMENT == "production" and 'ssl=' not in db_url and 'sslmode=' not in db_url:
-                db_url += '?ssl=require' if '?' not in db_url else '&ssl=require'
-
-            print(f"[Config] Using database URL: {db_url}", flush=True)
+            if self.RAILWAY_ENVIRONMENT == "production":
+                db_url += '?ssl=require'
+            
+            print(f"[Config] Using database from individual components: postgresql+asyncpg://{db_user}:*****@{db_host}:{db_port}/{db_name}", flush=True)
             return db_url
             
-        # Fallback to development database
-        print("[Config] Using development database URL", flush=True)
+        except Exception as e:
+            print(f"[Config] Error creating database URL from components: {e}", flush=True)
+            
+        # Fallback to development database if all else fails
+        print("[Config] WARNING: Using development database URL", flush=True)
         return self.DEV_DATABASE_URL
 
     @property
