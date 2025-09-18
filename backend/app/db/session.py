@@ -57,20 +57,13 @@ def create_db_engine():
             }
         }
         
-        # Handle SSL for production
-        if settings.RAILWAY_ENVIRONMENT == "production":
-            ssl_context = ssl.create_default_context()
-            ssl_context.check_hostname = False
-            ssl_context.verify_mode = ssl.CERT_NONE
-            connect_args["ssl"] = ssl_context
-            logger.info("Configured SSL for production environment")
-        
         # Log the database URL (with redacted password for security)
         if "@" in db_url:
             redacted_url = db_url.split("@")[0].split("://")[0] + "://*****:*****@" + "@".join(db_url.split("@")[1:])
             logger.info(f"Connecting to database: {redacted_url}")
-            
-        return create_async_engine(
+        
+        # Create the engine with appropriate SSL settings
+        engine = create_async_engine(
             db_url,
             echo=settings.DEBUG,
             pool_pre_ping=True,
@@ -79,6 +72,9 @@ def create_db_engine():
             max_overflow=10,   # Allow up to 10 overflow connections
             connect_args=connect_args
         )
+        
+        logger.info("Database engine created successfully")
+        return engine
         
     except Exception as e:
         logger.error(f"Failed to create database engine: {str(e)}")

@@ -174,50 +174,57 @@ class Settings(BaseSettings):
     @property
     def DATABASE(self) -> str:
         """Return the database URL with proper SSL configuration for asyncpg."""
-        # Get database URL from environment variables
-        db_url = (
-            os.getenv("DATABASE_URL") or 
-            os.getenv("RAILWAY_DATABASE_URL") or 
-            self.DATABASE_URL
-        )
+        # First check for DATABASE_URL from Railway
+        db_url = os.getenv("DATABASE_URL") or os.getenv("RAILWAY_DATABASE_URL")
         
-        if not db_url:
-            raise ValueError(
-                "No database URL found. Please set DATABASE_URL or RAILWAY_DATABASE_URL environment variable."
-            )
+        if db_url:
+            # Convert postgres:// to postgresql+asyncpg://
+            if db_url.startswith("postgres://"):
+                db_url = db_url.replace("postgres://", "postgresql+asyncpg://", 1)
+            
+            # Handle SSL for production
+            if self.RAILWAY_ENVIRONMENT == "production":
+                from urllib.parse import urlparse, urlunparse, parse_qsl, urlencode
+                
+                # Parse the URL
+                parsed = urlparse(db_url)
+                query = dict(parse_qsl(parsed.query))
+                
+                # Remove sslmode if present (not valid for asyncpg)
+                if 'sslmode' in query:
+                    del query['sslmode']
+                
+                # Add ssl=require for production if not already set
+                if 'ssl' not in query:
+                    query['ssl'] = 'require'
+                
+                # Rebuild the URL
+                new_query = urlencode(query)
+                db_url = urlunparse(parsed._replace(query=new_query))
+            
+            # Log a redacted version of the URL
+            if "@" in db_url:
+                parts = db_url.split("@")
+                redacted_url = f"{parts[0].split('://')[0]}://*****:*****@{'@'.join(parts[1:])}"
+                print(f"[Config] Using database URL from environment: {redacted_url}", flush=True)
+            
+            return db_url
         
-        # Convert postgres:// to postgresql+asyncpg://
-        if db_url.startswith("postgres://"):
-            db_url = db_url.replace("postgres://", "postgresql+asyncpg://", 1)
+        # Fallback to individual components if no DATABASE_URL is set
+        print("[Config] No DATABASE_URL found, using individual components", flush=True)
         
-        # Handle SSL for production
+        # Build the URL from individual components
+        credentials = f"{self.POSTGRES_USER}"
+        if self.POSTGRES_PASSWORD:
+            credentials = f"{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}"
+            
+        db_url = f"postgresql+asyncpg://{credentials}@{self.POSTGRES_SERVER}:{self.POSTGRES_PORT}/{self.POSTGRES_DB}"
+        
+        # Add SSL if in production
         if self.RAILWAY_ENVIRONMENT == "production":
-            from urllib.parse import urlparse, urlunparse, parse_qsl, urlencode
-            
-            # Parse the URL
-            parsed = urlparse(db_url)
-            query = dict(parse_qsl(parsed.query))
-            
-            # Remove sslmode if present (not valid for asyncpg)
-            if 'sslmode' in query:
-                del query['sslmode']
-            
-            # Add ssl=require for production if not already set
-            if 'ssl' not in query:
-                query['ssl'] = 'require'
-            
-            # Rebuild the URL
-            new_query = urlencode(query)
-            db_url = urlunparse(parsed._replace(query=new_query))
+            db_url += "?ssl=require"
         
-        # Log a redacted version of the URL (hides password)
-        if "@" in db_url:
-            redacted_url = "@".join([
-                "://".join(db_url.split("://")[0], "*****:*****"),
-                "@".join(db_url.split("@")[1:])
-            ])
-            print(f"[Config] Using database URL: {redacted_url}", flush=True)
-        
+        print(f"[Config] Using database URL: {db_url}", flush=True)
         return db_url
         
     def _format_db_url(self, url: str) -> str:
