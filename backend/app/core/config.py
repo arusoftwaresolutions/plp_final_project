@@ -65,21 +65,15 @@ class Settings(BaseSettings):
     RAILWAY_ENVIRONMENT: str = os.getenv("RAILWAY_ENVIRONMENT", "production").lower()
     RAILWAY_SERVICE_NAME: Optional[str] = os.getenv("RAILWAY_SERVICE_NAME")
     
-    # Database configuration
-    # 1. First try DATABASE_URL (standard PostgreSQL URL)
-    # 2. Then try RAILWAY_DATABASE_URL (Railway's default)
-    # 3. Fall back to individual components
+    # Primary database URL (from Railway)
     DATABASE_URL: Optional[str] = None
     
-    # Individual database components (for building URL if needed)
+    # Fallback database configuration
     POSTGRES_SERVER: str = os.getenv("PGHOST") or os.getenv("POSTGRES_HOSTNAME") or "db"
     POSTGRES_USER: str = os.getenv("PGUSER") or os.getenv("POSTGRES_USER") or "postgres"
     POSTGRES_PASSWORD: str = os.getenv("PGPASSWORD") or os.getenv("POSTGRES_PASSWORD") or ""
     POSTGRES_DB: str = os.getenv("PGDATABASE") or os.getenv("POSTGRES_DB") or "railway"
     POSTGRES_PORT: str = str(os.getenv("PGPORT") or os.getenv("POSTGRES_PORT") or "5432")
-    
-    # Force SSL in production
-    POSTGRES_QUERY: str = "sslmode=require" if RAILWAY_ENVIRONMENT == "production" else ""
     
     def __init__(self, **data: Any):
         super().__init__(**data)
@@ -179,15 +173,52 @@ class Settings(BaseSettings):
     
     @property
     def DATABASE(self) -> str:
-        """Return the database URL with proper formatting and logging."""
-        # Always use the DATABASE_URL that was set in __init__
-        if hasattr(self, 'DATABASE_URL') and self.DATABASE_URL:
-            print(f"[Config] Using configured DATABASE_URL", flush=True)
-            return self.DATABASE_URL
+        """Return the database URL with proper SSL configuration for asyncpg."""
+        # Get database URL from environment variables
+        db_url = (
+            os.getenv("DATABASE_URL") or 
+            os.getenv("RAILWAY_DATABASE_URL") or 
+            self.DATABASE_URL
+        )
+        
+        if not db_url:
+            raise ValueError(
+                "No database URL found. Please set DATABASE_URL or RAILWAY_DATABASE_URL environment variable."
+            )
+        
+        # Convert postgres:// to postgresql+asyncpg://
+        if db_url.startswith("postgres://"):
+            db_url = db_url.replace("postgres://", "postgresql+asyncpg://", 1)
+        
+        # Handle SSL for production
+        if self.RAILWAY_ENVIRONMENT == "production":
+            from urllib.parse import urlparse, urlunparse, parse_qsl, urlencode
             
-        # This should not happen if __init__ was called properly
-        print("[Config] WARNING: No DATABASE_URL found, falling back to default", flush=True)
-        return "postgresql+asyncpg://postgres:@db:5432/railway"
+            # Parse the URL
+            parsed = urlparse(db_url)
+            query = dict(parse_qsl(parsed.query))
+            
+            # Remove sslmode if present (not valid for asyncpg)
+            if 'sslmode' in query:
+                del query['sslmode']
+            
+            # Add ssl=require for production if not already set
+            if 'ssl' not in query:
+                query['ssl'] = 'require'
+            
+            # Rebuild the URL
+            new_query = urlencode(query)
+            db_url = urlunparse(parsed._replace(query=new_query))
+        
+        # Log a redacted version of the URL (hides password)
+        if "@" in db_url:
+            redacted_url = "@".join([
+                "://".join(db_url.split("://")[0], "*****:*****"),
+                "@".join(db_url.split("@")[1:])
+            ])
+            print(f"[Config] Using database URL: {redacted_url}", flush=True)
+        
+        return db_url
         
     def _format_db_url(self, url: str) -> str:
         """Format the database URL to use asyncpg driver and add SSL if needed."""

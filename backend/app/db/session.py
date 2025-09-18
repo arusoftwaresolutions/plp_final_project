@@ -45,37 +45,44 @@ def parse_db_url(db_url: str) -> Dict[str, Any]:
 
 def create_db_engine():
     """Create and return an async database engine with proper configuration."""
-    db_url = settings.DATABASE
-    logger.info(f"Creating database engine for URL: {db_url}")
-    
-    # Parse the database URL
-    db_params = parse_db_url(db_url)
-    
-    # Configure connection arguments
-    connect_args: Dict[str, Any] = {
-        "server_settings": {
-            "application_name": settings.RAILWAY_SERVICE_NAME or "sdg_backend",
-            "timezone": "UTC",
-        },
-        "ssl": get_ssl_context() if settings.RAILWAY_ENVIRONMENT == "production" else None
-    }
-    
-    # Add any additional query parameters
-    if db_params["query"]:
-        connect_args.update(dict(pair.split("=") for pair in db_params["query"].split("&")))
-    
-    logger.info(f"Database engine configuration complete")
-    
-    # Create and return the engine
-    return create_async_engine(
-        db_url,
-        echo=settings.DEBUG,
-        pool_pre_ping=True,
-        pool_recycle=300,  # Recycle connections after 5 minutes
-        pool_size=5,       # Maintain up to 5 connections
-        max_overflow=10,   # Allow up to 10 overflow connections
-        connect_args=connect_args
-    )
+    try:
+        db_url = settings.DATABASE
+        logger.info("Initializing database engine")
+        
+        # Configure connection arguments
+        connect_args: Dict[str, Any] = {
+            "server_settings": {
+                "application_name": settings.RAILWAY_SERVICE_NAME or "sdg_backend",
+                "timezone": "UTC",
+            }
+        }
+        
+        # Handle SSL for production
+        if settings.RAILWAY_ENVIRONMENT == "production":
+            ssl_context = ssl.create_default_context()
+            ssl_context.check_hostname = False
+            ssl_context.verify_mode = ssl.CERT_NONE
+            connect_args["ssl"] = ssl_context
+            logger.info("Configured SSL for production environment")
+        
+        # Log the database URL (with redacted password for security)
+        if "@" in db_url:
+            redacted_url = db_url.split("@")[0].split("://")[0] + "://*****:*****@" + "@".join(db_url.split("@")[1:])
+            logger.info(f"Connecting to database: {redacted_url}")
+            
+        return create_async_engine(
+            db_url,
+            echo=settings.DEBUG,
+            pool_pre_ping=True,
+            pool_recycle=300,  # Recycle connections after 5 minutes
+            pool_size=5,       # Maintain up to 5 connections
+            max_overflow=10,   # Allow up to 10 overflow connections
+            connect_args=connect_args
+        )
+        
+    except Exception as e:
+        logger.error(f"Failed to create database engine: {str(e)}")
+        raise
 
 # Create the database engine
 try:
