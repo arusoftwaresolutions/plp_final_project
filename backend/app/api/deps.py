@@ -8,13 +8,13 @@ Usage in endpoint modules:
         ...
 """
 
-from app.db.session import get_db  # AsyncSession provider
-from app.core.security import (
+from backend.app.db.session import get_db  # AsyncSession provider
+from backend.app.core.security import (
     get_current_user,
     get_current_active_user,
     get_current_active_superuser,
 )
-from app.db.models import User
+from backend.app.db.models import User
 
 def is_superuser(user: User) -> bool:
     """Return True if the user has an 'admin' role or is_superuser attribute."""

@@ -11,8 +11,8 @@ services:
       pip install -e .
       pip install -r requirements.txt
       
-    # Start command - using our app factory pattern
-    startCommand: uvicorn app:app --host 0.0.0.0 --port 10000
+    # Start command - using the main module path
+    startCommand: uvicorn backend.app.main:app --host 0.0.0.0 --port $PORT
     
     # Environment variables
     envVars:
@@ -39,12 +39,11 @@ services:
       - key: FIRST_SUPERUSER_EMAIL
         value: admin@example.com
       - key: FIRST_SUPERUSER_PASSWORD
-        value: "admin123"
+        generateValue: true
         
       # CORS - update with your frontend URL
       - key: BACKEND_CORS_ORIGINS
         value: '["http://localhost:3000"]'
-
 
 # Database configuration
 databases:

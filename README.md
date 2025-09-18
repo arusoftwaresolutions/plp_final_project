@@ -180,6 +180,41 @@ SDG!/
    docker-compose logs -f
    ```
 
+## Deployment to Render
+
+This project includes a `render.yaml` file that makes deployment to Render simple and automated. Follow these steps:
+
+1. **Push your code to a Git repository**
+   - Make sure your code is pushed to a GitHub or GitLab repository
+
+2. **Deploy to Render**
+   - Go to your [Render Dashboard](https://dashboard.render.com/)
+   - Click "New +" and select "Blueprint"
+   - Connect your repository
+   - Click "Apply" to deploy all services defined in `render.yaml`
+
+3. **Environment Variables**
+   The following environment variables will be automatically configured by Render:
+   - `ENVIRONMENT=production`
+   - `SECRET_KEY` (auto-generated)
+   - `ALGORITHM=HS256`
+   - `ACCESS_TOKEN_EXPIRE_MINUTES=1440`
+   - `FIRST_SUPERUSER=admin`
+   - `FIRST_SUPERUSER_EMAIL=admin@example.com`
+   - `FIRST_SUPERUSER_PASSWORD` (auto-generated)
+   - `BACKEND_CORS_ORIGINS=["http://localhost:3000"]`
+   - `DATABASE_URL` (auto-configured from the PostgreSQL service)
+
+4. **Access the Application**
+   - Once deployed, you can access your application at the provided Render URL
+   - API documentation is available at `/docs` (Swagger UI) and `/redoc` (ReDoc)
+   - Health check endpoint: `/health`
+
+5. **Admin Access**
+   - The first superuser will be created automatically with the credentials:
+     - Email: `admin@example.com`
+     - Password: Check the logs or Render environment variables for the generated password
+
 ### Manual Setup
 
 #### Backend

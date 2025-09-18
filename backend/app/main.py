@@ -1,14 +1,22 @@
+"""
+Main application module for the Poverty Alleviation Platform.
+This module contains the FastAPI application and database initialization code.
+"""
 import os
+import sys
+from pathlib import Path
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta
 from typing import Optional
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
-from sqlalchemy import text, select
-from sqlalchemy.engine.url import make_url
+from fastapi.responses import JSONResponse
+from sqlalchemy import select
 import traceback
 from dotenv import load_dotenv
+
+# Add the project root to the Python path
+sys.path.append(str(Path(__file__).parent.parent.parent))
 
 # Load environment variables in development
 _ENV = os.getenv("ENVIRONMENT", "production").lower()
@@ -16,280 +24,201 @@ if _ENV in ("dev", "development", "local"):
     load_dotenv(override=True)
 
 # Local imports
-try:
-    from backend.app.core.config import settings
-    from backend.app.db.session import engine, Base, AsyncSessionLocal
-    from backend.app.core.security import get_password_hash
-    from backend.app.db.models import (
-        User, Role, Transaction, TransactionType, TransactionCategory,
-        MicroLoan, CrowdFundingCampaign, Donation, PovertyArea,
-        Notification, NotificationType
-    )
-except ImportError as e:
-    import sys
-    print(f"Import error: {e}")
-    print(f"Python path: {sys.path}")
-    raise
+from backend.app.core.config import settings
+from backend.app.db.session import engine, Base, AsyncSessionLocal
+from backend.app.core.security import get_password_hash
+from backend.app.api.api_v1.api import api_router
 
-# Safe int parser to handle Railway's masked values and other edge cases
+# Import models to register them with SQLAlchemy
+from backend.app.db.models import *  # noqa
+
+# Safe int parser to handle masked values and other edge cases
 def safe_int(val: Optional[str], default: int) -> int:
-    """Safely convert a string to an integer, handling various edge cases.
-    
-    Args:
-        val: The value to convert to an integer. Can be None or any string.
-        default: The default value to return if conversion fails.
-        
-    Returns:
-        The converted integer, or the default value if conversion fails.
-    """
+    """Safely convert a string to an integer, handling various edge cases."""
     if val is None:
         return default
-        
-    # Handle masked values (Railway masks sensitive values with '*****')
-    if isinstance(val, str) and '*****' in val:
+    if isinstance(val, str) and '*****' in val:  # Handle masked values
         print(f"[WARNING] Attempted to convert masked value to int: {val}")
         return default
-        
     try:
-        # Remove any non-numeric characters except minus sign
-        if isinstance(val, str):
-            cleaned = ''.join(c for c in val if c.isdigit() or c == '-')
-            if cleaned and cleaned != '-':  # Ensure we have at least one digit
-                return int(cleaned)
-        return default
-    except (TypeError, ValueError) as e:
-        print(f"[WARNING] Failed to convert {val} to int: {e}")
+        return int(val)
+    except (ValueError, TypeError):
         return default
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    print("[Startup] Environment variables:", flush=True)
-    for key, value in sorted(os.environ.items()):
-        if any(k in key.lower() for k in ['db', 'postgres', 'database', 'railway']):
-            print(f"  {key}: {value}", flush=True)
-
+async def init_db():
+    """Initialize the database with sample data."""
     try:
-        db_url = settings.DATABASE
-        if db_url and '@' in db_url:
-            parts = db_url.split('@')
-            redacted_url = f"{parts[0].split('://')[0]}://*****:*****@{'@'.join(parts[1:])}"
-            print(f"[Startup] Using database URL: {redacted_url}", flush=True)
-        else:
-            print(f"[Startup] Using database URL: {db_url}", flush=True)
-
-        # Test database connection with retry logic
-        max_retries = 3
-        retry_delay = 2
-        for attempt in range(max_retries):
-            try:
-                print(f"[Startup] Testing database connection (attempt {attempt + 1}/{max_retries})...", flush=True)
-                async with engine.connect() as conn:
-                    result = await conn.execute(text("SELECT version()"))
-                    version = result.scalar()
-                    print(f"[Startup] Successfully connected to database. Version: {version}", flush=True)
-                    break
-            except Exception as db_error:
-                if attempt == max_retries - 1:
-                    print(f"[Startup] ERROR: Failed to connect to database after {max_retries} attempts", flush=True)
-                    print(f"[Startup] Connection error: {str(db_error)}", flush=True)
-                    raise
-                print(f"[Startup] WARNING: Database connection attempt {attempt + 1} failed: {db_error}", flush=True)
-                import time
-                time.sleep(retry_delay)
-
-        # Create tables
-        async with engine.begin() as conn:
-            await conn.run_sync(Base.metadata.create_all)
-        print("[Startup] Tables are ready.", flush=True)
-
-        # Seed admin role and user
         async with AsyncSessionLocal() as db:
-            result = await db.execute(select(Role).where(Role.name == "admin"))
-            admin_role = result.scalar_one_or_none()
-            if not admin_role:
-                admin_role = Role(name="admin", description="Administrator")
-                db.add(admin_role)
-                await db.flush()
+            # Check if we already have data
+            result = await db.execute(select(Role).limit(1))
+            if result.scalars().first() is not None:
+                return  # Database already initialized
 
-            result = await db.execute(select(User).where(User.email == settings.FIRST_SUPERUSER_EMAIL))
-            admin_user = result.scalar_one_or_none()
-            if not admin_user:
-                admin_user = User(
-                    username=settings.FIRST_SUPERUSER,
-                    email=settings.FIRST_SUPERUSER_EMAIL,
-                    hashed_password=get_password_hash(settings.FIRST_SUPERUSER_PASSWORD),
+            # Create roles
+            admin_role = Role(name="admin", description="Administrator with full access")
+            user_role = Role(name="user", description="Regular user")
+            donor_role = Role(name="donor", description="Donor user")
+            
+            db.add_all([admin_role, user_role, donor_role])
+            await db.flush()
+
+            # Create admin user
+            admin_user = User(
+                username=settings.FIRST_SUPERUSER,
+                email=settings.FIRST_SUPERUSER_EMAIL,
+                hashed_password=get_password_hash(settings.FIRST_SUPERUSER_PASSWORD),
+                is_active=True,
+                is_verified=True,
+                roles=[admin_role]
+            )
+            db.add(admin_user)
+            await db.flush()
+            
+            # Create sample users
+            sample_users = [
+                {"username": "john", "email": "john@example.com", "roles": [user_role]},
+                {"username": "sara", "email": "sara@example.com", "roles": [user_role]},
+                {"username": "dana", "email": "dana@example.com", "roles": [donor_role]},
+                {"username": "peter", "email": "peter@example.com", "roles": [donor_role]},
+            ]
+            
+            created_users = {}
+            default_pwd = "SamplePass123!"
+            
+            for user_data in sample_users:
+                user = User(
+                    username=user_data["username"],
+                    email=user_data["email"],
+                    hashed_password=get_password_hash(default_pwd),
                     is_active=True,
                     is_verified=True,
+                    roles=user_data["roles"]
                 )
-                db.add(admin_user)
-                await db.flush()
-
-            if admin_role not in (admin_user.roles or []):
-                if not admin_user.roles:
-                    admin_user.roles = []
-                admin_user.roles.append(admin_role)
-
-            await db.commit()
-            print("[Startup] Admin user and role are ensured.", flush=True)
-
-            # Seed core roles and sample users
-            sample_roles = [("user", "Standard user"), ("donor", "Donor user")]
-            existing_roles = {r.name for r in (await db.execute(select(Role))).scalars().all()}
-            for name, desc in sample_roles:
-                if name not in existing_roles:
-                    db.add(Role(name=name, description=desc))
+                db.add(user)
+                created_users[user_data["username"]] = user
+            
             await db.flush()
-            roles_map = {r.name: r for r in (await db.execute(select(Role))).scalars().all()}
-
-            default_pwd = "SamplePass123!"
-            sample_users = [
-                {"username": "john", "email": "john@example.com", "roles": ["user"]},
-                {"username": "sara", "email": "sara@example.com", "roles": ["user"]},
-                {"username": "dana", "email": "dana.donor@example.com", "roles": ["donor"]},
-                {"username": "peter", "email": "peter.donor@example.com", "roles": ["donor"]},
-            ]
-            created_users = {}
-            for u in sample_users:
-                result = await db.execute(select(User).where(User.email == u["email"]))
-                user_obj = result.scalar_one_or_none()
-                if not user_obj:
-                    user_obj = User(
-                        username=u["username"],
-                        email=u["email"],
-                        hashed_password=get_password_hash(default_pwd),
-                        is_active=True,
-                        is_verified=True,
-                    )
-                    db.add(user_obj)
-                    await db.flush()
-                if not user_obj.roles:
-                    user_obj.roles = []
-                for rn in u["roles"]:
-                    role_obj = roles_map.get(rn)
-                    if role_obj and role_obj not in user_obj.roles:
-                        user_obj.roles.append(role_obj)
-                created_users[u["username"]] = user_obj
-            await db.flush()
-
-            # Demo crowdfunding campaign
-            result = await db.execute(select(CrowdFundingCampaign))
-            if result.scalars().first() is None:
-                demo_campaign = CrowdFundingCampaign(
+            
+            # Create sample campaign if none exists
+            result = await db.execute(select(CrowdFundingCampaign).limit(1))
+            if not result.scalars().first():
+                campaign = CrowdFundingCampaign(
                     title="Clean Water for Village X",
-                    description="Provide clean water access by building a well and filtration system.",
-                    target_amount=5000.0,
+                    description="Help us provide clean water to Village X by building a new well.",
+                    target_amount=10000.0,
                     amount_raised=0.0,
                     end_date=datetime.utcnow() + timedelta(days=30),
                     status="active",
                     location={"lat": 9.03, "lng": 38.74, "address": "Village X"},
-                    created_by=created_users.get("john").id
+                    created_by=created_users["john"].id
                 )
-                db.add(demo_campaign)
+                db.add(campaign)
                 await db.flush()
-                for donor_username, amount in [("dana", 100.0), ("peter", 250.0)]:
-                    donor_user = created_users.get(donor_username)
-                    if donor_user:
-                        db.add(Donation(
-                            campaign_id=demo_campaign.id,
-                            donor_id=donor_user.id,
-                            amount=amount,
-                            message=f"Support from {donor_username}",
-                            is_anonymous=False,
-                        ))
-                await db.flush()
+                
+                # Add sample donations
+                donations = [
+                    {"donor": "dana", "amount": 250.0, "message": "Happy to help!"},
+                    {"donor": "peter", "amount": 500.0, "message": "Great cause!"}
+                ]
+                
+                for donation_data in donations:
+                    donor = created_users[donation_data["donor"]]
+                    donation = Donation(
+                        campaign_id=campaign.id,
+                        donor_id=donor.id,
+                        amount=donation_data["amount"],
+                        message=donation_data["message"],
+                        is_anonymous=False
+                    )
+                    db.add(donation)
+                    campaign.amount_raised += donation.amount
+            
             await db.commit()
-            print("[Startup] Sample data ensured.", flush=True)
-
+            print("[Startup] Database initialized with sample data")
+            
     except Exception as e:
-        print(f"[Startup] Initialization error: {e}", flush=True)
+        await db.rollback()
+        print(f"[Startup] Error initializing database: {e}")
         traceback.print_exc()
 
-    yield
-
-def create_app():
-    """Create and configure the FastAPI application."""
-    app = FastAPI(
-        title=settings.PROJECT_NAME,
-        description="Poverty Alleviation Platform API",
-        version=settings.VERSION,
-    )
-
-    # Import and include routers after app creation to avoid circular imports
-    try:
-        from backend.app.api.api_v1.api import api_router
-        app.include_router(api_router, prefix=settings.API_V1_STR)
-    except Exception as e:
-        print(f"[Startup] Could not import API router: {e}")
-        traceback.print_exc()
-
-    # Add CORS middleware
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=settings.BACKEND_CORS_ORIGINS,
-        allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
-    )
-
-    # Mount static files if in production
-    if settings.ENVIRONMENT == "production":
-        app.mount("/static", StaticFiles(directory="static"), name="static")
-
-    # Add startup and shutdown event handlers
-    app.router.lifespan_context = lifespan
-
-    # Add health check endpoints
-    @app.get("/health")
-    async def health_check():
-        return {"status": "healthy"}
-
-    @app.get("/liveness")
-    async def liveness_probe():
-        return {"status": "alive"}
-
-    @app.get("/readiness")
-    async def readiness_probe():
-        try:
-            async with AsyncSessionLocal() as db:
-                await db.execute(text("SELECT 1"))
-            return {"status": "ready"}
-        except Exception as e:
-            return {"status": "not ready", "error": str(e)}
-
-    @app.get("/")
-    async def root():
-        return {
-            "message": "Welcome to the Poverty Alleviation Platform API",
-            "version": settings.VERSION,
-            "environment": settings.ENVIRONMENT,
-            "docs": "/docs",
-            "redoc": "/redoc"
-        }
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Handle application startup and shutdown events."""
+    # Create database tables
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
     
-    return app
+    # Initialize database with sample data
+    await init_db()
+    
+    yield
+    
+    # Clean up resources on shutdown
+    await engine.dispose()
 
-# Create the app instance
-app = create_app()
+# Create the FastAPI application with lifespan management
+app = FastAPI(
+    title="Poverty Alleviation Platform API",
+    description="API for the Poverty Alleviation Platform",
+    version="1.0.0",
+    docs_url="/docs",
+    redoc_url="/redoc",
+    lifespan=lifespan
+)
 
+# Add CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=settings.BACKEND_CORS_ORIGINS,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Include API router
+app.include_router(api_router, prefix=settings.API_V1_STR)
+
+# Health check endpoint
+@app.get("/health", tags=["health"])
+async def health_check():
+    """Health check endpoint for monitoring."""
+    return {
+        "status": "healthy",
+        "version": "1.0.0",
+        "environment": settings.ENVIRONMENT
+    }
+
+# Root endpoint
+@app.get("/", tags=["root"])
+async def root():
+    """Root endpoint with API information."""
+    return {
+        "message": "Welcome to the Poverty Alleviation Platform API",
+        "version": "1.0.0",
+        "environment": settings.ENVIRONMENT,
+        "docs": "/docs",
+        "redoc": "/redoc"
+    }
+
+# Exception handler
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    """Global exception handler."""
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "Internal server error"},
+    )
+
+# This allows running with `python -m backend.app.main` for local development
 if __name__ == "__main__":
     import uvicorn
     
     # Get the port from environment variable with fallback
-    port_env = os.getenv("PORT")
-    port = safe_int(port_env, 8000)
-    
-    # Additional fallback if we still don't have a valid port
-    if not isinstance(port, int) or port <= 0 or port > 65535:
-        print(f"[WARNING] Invalid port {port_env}, defaulting to 8000")
-        port = 8000
-    
-    print(f"[Startup] Starting server on port {port}")
+    port = int(os.getenv("PORT", 8000))
     
     uvicorn.run(
-        "app.main:app",
+        "backend.app.main:app",
         host="0.0.0.0",
         port=port,
-        reload=True,
-        reload_dirs=["app"],
-        log_level="info"
+        reload=settings.ENVIRONMENT != "production"
     )
