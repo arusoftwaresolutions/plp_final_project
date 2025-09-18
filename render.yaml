@@ -1,57 +1,51 @@
-# Render configuration for Poverty Alleviation Platform
-# Documentation: https://render.com/docs
+# Render configuration for Poverty Alleviation Platform (Free Tier)
+# Free tier has limitations - no custom build/start commands
 
 services:
   - type: web
-    name: poverty-alleviation-backend  # Update with your preferred service name
+    name: poverty-alleviation
     env: python
-    region: oregon  # Choose the region closest to your users
+    region: oregon  # Choose closest to your users
     plan: free
     
-    # Build configuration
-    buildCommand: ./render-build.sh
-    
-    # Start command - uses our optimized start script
-    startCommand: ./start.sh
+    # Free tier doesn't allow custom build/start commands
+    # It will automatically install requirements.txt and look for app.py or main.py
     
     # Environment variables
     envVars:
-      # Application settings
       - key: ENVIRONMENT
         value: production
-      - key: PYTHONUNBUFFERED
-        value: "1"
-      
-      # Database configuration (automatically connected)
+        
+      # Database
       - key: DATABASE_URL
         fromDatabase:
           name: poverty-db
           property: connectionString
-      
-      # Authentication settings
+          
+      # Authentication
       - key: SECRET_KEY
         generateValue: true
       - key: ALGORITHM
         value: HS256
       - key: ACCESS_TOKEN_EXPIRE_MINUTES
-        value: "1440"  # 24 hours
-      
-      # Admin user (password will be auto-generated)
+        value: "1440"
+        
+      # Admin user
       - key: FIRST_SUPERUSER
         value: admin
       - key: FIRST_SUPERUSER_EMAIL
         value: admin@example.com
       - key: FIRST_SUPERUSER_PASSWORD
         generateValue: true
-      
-      # CORS settings - update with your frontend URL
+        
+      # CORS - update with your frontend URL
       - key: BACKEND_CORS_ORIGINS
-        value: '["http://localhost:3000", "https://your-frontend-domain.com"]'
+        value: '["http://localhost:3000"]'
 
 # Database configuration
 databases:
   - name: poverty-db
     databaseName: poverty_alleviation
     user: admin
-    plan: free  # Free tier has limited resources
-    deleteProtection: false  # Set to true in production
+    plan: free
+    deleteProtection: false
