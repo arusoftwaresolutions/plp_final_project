@@ -1,5 +1,5 @@
 from pydantic import AnyHttpUrl, EmailStr, PostgresDsn, validator, Field, BaseSettings
-from typing import List, Optional, Union
+from typing import List, Optional, Union, Dict, Any
 import os
 from dotenv import load_dotenv
 
@@ -7,6 +7,12 @@ from dotenv import load_dotenv
 _ENV = os.getenv("ENVIRONMENT", "production").lower()
 if _ENV in ("dev", "development", "local"):
     load_dotenv(override=True)
+
+# Print all environment variables for debugging
+print("\n[Config] Environment variables:", flush=True)
+for key, value in sorted(os.environ.items()):
+    if any(k in key.upper() for k in ['POSTGRES', 'DATABASE', 'PG', 'RAILWAY', 'ENV']):
+        print(f"  {key}: {value}", flush=True)
 
 class Settings(BaseSettings):
     # Project
@@ -55,13 +61,15 @@ class Settings(BaseSettings):
         print("[Config] Using default CORS origins (no custom configuration found)", flush=True)
         return default_origins
     
-    # Railway provides these env vars
+    # Railway environment
     RAILWAY_ENVIRONMENT: str = os.getenv("RAILWAY_ENVIRONMENT", "production").lower()
     RAILWAY_SERVICE_NAME: Optional[str] = os.getenv("RAILWAY_SERVICE_NAME")
     
-    # Database connection settings - prioritize direct URL first
-    # Check for both DATABASE_URL and RAILWAY_DATABASE_URL
-    DATABASE_URL: Optional[str] = os.getenv("DATABASE_URL") or os.getenv("RAILWAY_DATABASE_URL")
+    # Database configuration
+    # 1. First try DATABASE_URL (standard PostgreSQL URL)
+    # 2. Then try RAILWAY_DATABASE_URL (Railway's default)
+    # 3. Fall back to individual components
+    DATABASE_URL: Optional[str] = None
     
     # Individual database components (for building URL if needed)
     POSTGRES_SERVER: str = os.getenv("PGHOST") or os.getenv("POSTGRES_HOSTNAME") or "db"
@@ -73,64 +81,91 @@ class Settings(BaseSettings):
     # Force SSL in production
     POSTGRES_QUERY: str = "sslmode=require" if RAILWAY_ENVIRONMENT == "production" else ""
     
-    def __init__(self, **values):
-        super().__init__(**values)
+    def __init__(self, **data: Any):
+        super().__init__(**data)
+        
         # Debug print all database-related environment variables
-        print("\n[Config] Database Environment Variables:", flush=True)
+        print("\n[Config] Environment Variables:", flush=True)
         for key, value in os.environ.items():
-            if any(k in key.upper() for k in ['POSTGRES', 'DATABASE', 'PG']):
+            if any(k in key.upper() for k in ['POSTGRES', 'DATABASE', 'PG', 'RAILWAY', 'ENV']):
                 print(f"  {key}: {value}", flush=True)
         
-        print("\n[Config] Final Database Configuration:", flush=True)
+        # Database Configuration
+        print("\n[Config] Database Configuration:", flush=True)
+        
+        # 1. Check for direct DATABASE_URL
+        if os.getenv("DATABASE_URL"):
+            self.DATABASE_URL = os.getenv("DATABASE_URL")
+            print(f"  Using DATABASE_URL from environment: {self.DATABASE_URL}", flush=True)
+        # 2. Check for Railway's database URL
+        elif os.getenv("RAILWAY_DATABASE_URL"):
+            self.DATABASE_URL = os.getenv("RAILWAY_DATABASE_URL")
+            print(f"  Using RAILWAY_DATABASE_URL: {self.DATABASE_URL}", flush=True)
+        # 3. Fall back to individual components
+        else:
+            print("  No DATABASE_URL found, using individual components", flush=True)
+            self.DATABASE_URL = (
+                f"postgresql+asyncpg://{self.POSTGRES_USER}:"
+                f"{self.POSTGRES_PASSWORD}@{self.POSTGRES_SERVER}:"
+                f"{self.POSTGRES_PORT}/{self.POSTGRES_DB}"
+            )
+        
+        # Ensure the URL uses the correct protocol
+        if self.DATABASE_URL and self.DATABASE_URL.startswith("postgres://"):
+            self.DATABASE_URL = self.DATABASE_URL.replace("postgres://", "postgresql+asyncpg://", 1)
+        
+        # Add SSL if in production
+        if self.RAILWAY_ENVIRONMENT == "production" and "?" not in self.DATABASE_URL:
+            self.DATABASE_URL += "?sslmode=require"
+        
+        # CORS Configuration
+        frontend_url = os.getenv("FRONTEND_URL") or os.getenv("RAILWAY_STATIC_URL")
+        if frontend_url:
+            frontend_url = frontend_url.rstrip('/')
+            if frontend_url not in [str(x) for x in self.BACKEND_CORS_ORIGINS]:
+                self.BACKEND_CORS_ORIGINS.append(frontend_url)
+        
+        # Print final configuration
+        print("\n[Config] Final Configuration:", flush=True)
         print(f"  DATABASE_URL: {self.DATABASE_URL}", flush=True)
         print(f"  POSTGRES_SERVER: {self.POSTGRES_SERVER}", flush=True)
         print(f"  POSTGRES_USER: {self.POSTGRES_USER}", flush=True)
         print(f"  POSTGRES_DB: {self.POSTGRES_DB}", flush=True)
         print(f"  POSTGRES_PORT: {self.POSTGRES_PORT}", flush=True)
         print(f"  RAILWAY_ENVIRONMENT: {self.RAILWAY_ENVIRONMENT}", flush=True)
-        
-        # Print CORS configuration
-        print("\n[Config] CORS Configuration:", flush=True)
-        print(f"  FRONTEND_URL: {os.getenv('FRONTEND_URL')}", flush=True)
+        print(f"  FRONTEND_URL: {frontend_url}", flush=True)
         print(f"  BACKEND_CORS_ORIGINS: {self.BACKEND_CORS_ORIGINS}", flush=True)
-        print(f"  RAILWAY_ENVIRONMENT: {self.RAILWAY_ENVIRONMENT}", flush=True)
     
     @validator("DATABASE_URL", pre=True)
     def assemble_db_connection(cls, v: Optional[str], values: dict) -> str:
-        # Debug print all values for troubleshooting
-        print(f"[Config] Assembling DB URL. DATABASE_URL: {v}", flush=True)
-        print(f"[Config] Available values: {values}", flush=True)
-        
-        # If DATABASE_URL is explicitly provided in environment, use it directly
-        env_db_url = os.getenv("DATABASE_URL")
-        if env_db_url:
-            print(f"[Config] Using DATABASE_URL from environment", flush=True)
-            v = env_db_url
-        
+        # This is now handled in __init__, but we keep this for backward compatibility
         if v:
-            print(f"[Config] Using DATABASE_URL: {v}", flush=True)
+            print(f"[Config] Using provided DATABASE_URL: {v}", flush=True)
             # Convert postgres:// to postgresql+asyncpg://
             if v.startswith("postgres://"):
                 v = v.replace("postgres://", "postgresql+asyncpg://", 1)
-            # Ensure it uses asyncpg
-            elif not (v.startswith("postgresql+asyncpg://") or v.startswith("postgresql://")):
-                v = f"postgresql+asyncpg://{v}"
             return v
-            
-        # Otherwise build from components
-        user = values.get("POSTGRES_USER") or os.getenv("POSTGRES_USER") or "postgres"
-        password = values.get("POSTGRES_PASSWORD") or os.getenv("POSTGRES_PASSWORD") or ""
-        host = values.get("POSTGRES_SERVER") or os.getenv("POSTGRES_SERVER") or "db"
-        port = values.get("POSTGRES_PORT") or os.getenv("POSTGRES_PORT") or "5432"
-        db = values.get("POSTGRES_DB") or os.getenv("POSTGRES_DB") or "railway"
-        query = values.get("POSTGRES_QUERY") or os.getenv("POSTGRES_QUERY") or ""
         
-        # Construct the URL with defaults
+        # If we get here, we'll build from components
+        print("[Config] Building database URL from components", flush=True)
+        
+        user = values.get("POSTGRES_USER") or os.getenv("PGUSER") or "postgres"
+        password = values.get("POSTGRES_PASSWORD") or os.getenv("PGPASSWORD") or ""
+        host = values.get("POSTGRES_SERVER") or os.getenv("PGHOST") or "db"
+        port = values.get("POSTGRES_PORT") or os.getenv("PGPORT") or "5432"
+        db = values.get("POSTGRES_DB") or os.getenv("PGDATABASE") or "railway"
+        
+        # Build the URL
         url = f"postgresql+asyncpg://{user}:{password}@{host}:{port}/{db}"
-        if query:
-            url = f"{url}?{query}"
         
-        print(f"[Config] Constructed database URL from components: {url}", flush=True)
+        # Add SSL if in production
+        if os.getenv("RAILWAY_ENVIRONMENT") == "production":
+            if "?" not in url:
+                url += "?sslmode=require"
+            elif "sslmode=" not in url:
+                url += "&sslmode=require"
+        
+        print(f"[Config] Built database URL: {url}", flush=True)
         return url
     
     @property
@@ -141,41 +176,33 @@ class Settings(BaseSettings):
     @property
     def DATABASE(self) -> str:
         """Return the database URL with proper formatting and logging."""
-        # 1. First try RAILWAY_DATABASE_URL (Railway's default)
-        if self.RAILWAY_DATABASE_URL:
-            url = self.RAILWAY_DATABASE_URL
-            print(f"[Config] Using RAILWAY_DATABASE_URL: {url}", flush=True)
-            return self._format_db_url(url)
-            
-        # 2. Try direct DATABASE_URL from environment
-        env_db_url = os.getenv("DATABASE_URL")
-        if env_db_url:
-            print(f"[Config] Using DATABASE_URL from environment", flush=True)
-            return self._format_db_url(env_db_url)
-            
-        # 3. Try DATABASE_URL from settings
+        # If we already have a DATABASE_URL, use it
         if hasattr(self, 'DATABASE_URL') and self.DATABASE_URL:
-            print("[Config] Using DATABASE_URL from settings", flush=True)
-            return self._format_db_url(self.DATABASE_URL)
+            url = self.DATABASE_URL
+            print(f"[Config] Using configured DATABASE_URL: {url}", flush=True)
+            return url
             
-        # 4. Build from individual components
+        # Fall back to building from components
         print("[Config] Building database URL from components", flush=True)
-        user = self.POSTGRES_USER
-        password = self.POSTGRES_PASSWORD
-        host = self.POSTGRES_SERVER
-        port = self.POSTGRES_PORT
-        db = self.POSTGRES_DB
-        query = self.POSTGRES_QUERY
         
-        # Construct the URL
-        credentials = f"{user}"
-        if password:
-            credentials = f"{user}:{password}"
-            
+        # Get values from environment or instance attributes
+        user = os.getenv("PGUSER") or getattr(self, 'POSTGRES_USER', 'postgres')
+        password = os.getenv("PGPASSWORD") or getattr(self, 'POSTGRES_PASSWORD', '')
+        host = os.getenv("PGHOST") or getattr(self, 'POSTGRES_SERVER', 'db')
+        port = os.getenv("PGPORT") or getattr(self, 'POSTGRES_PORT', '5432')
+        db = os.getenv("PGDATABASE") or getattr(self, 'POSTGRES_DB', 'railway')
+        
+        # Build the URL
+        credentials = f"{user}:{password}" if password else user
         url = f"postgresql+asyncpg://{credentials}@{host}:{port}/{db}"
-        if query:
-            url = f"{url}?{query}"
-            
+        
+        # Add SSL if in production
+        if self.RAILWAY_ENVIRONMENT == "production":
+            if "?" not in url:
+                url += "?sslmode=require"
+            elif "sslmode=" not in url:
+                url += "&sslmode=require"
+        
         print(f"[Config] Final database URL: {url}", flush=True)
         return url
         
@@ -184,16 +211,20 @@ class Settings(BaseSettings):
         if not url:
             return url
             
-        # Convert postgres:// to postgresql+asyncpg://
+        # Ensure we have the correct protocol
         if url.startswith("postgres://"):
             url = url.replace("postgres://", "postgresql+asyncpg://", 1)
         elif not (url.startswith("postgresql+asyncpg://") or url.startswith("postgresql://")):
             url = f"postgresql+asyncpg://{url}"
-            
+        
         # Add SSL if in production and not already specified
-        if self.RAILWAY_ENVIRONMENT == "production" and "?sslmode=" not in url:
-            url += "?sslmode=require"
-            
+        if self.RAILWAY_ENVIRONMENT == "production":
+            if "?" not in url:
+                url += "?sslmode=require"
+            elif "sslmode=" not in url:
+                url += "&sslmode=require"
+        
+        print(f"[Config] Formatted database URL: {url}", flush=True)
         return url
     
     # Admin
