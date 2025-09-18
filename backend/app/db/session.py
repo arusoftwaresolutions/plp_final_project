@@ -3,7 +3,7 @@ from sqlalchemy.orm import declarative_base
 import os
 import ssl
 import logging
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, AsyncGenerator
 from urllib.parse import urlparse
 
 from app.core.config import settings
