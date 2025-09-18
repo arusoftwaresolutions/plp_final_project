@@ -60,13 +60,11 @@ class Settings(BaseSettings):
     RAILWAY_SERVICE_NAME: Optional[str] = os.getenv("RAILWAY_SERVICE_NAME")
     
     # Database connection settings - prioritize direct URL first
-    DATABASE_URL: Optional[str] = os.getenv("DATABASE_URL")
+    # Check for both DATABASE_URL and RAILWAY_DATABASE_URL
+    DATABASE_URL: Optional[str] = os.getenv("DATABASE_URL") or os.getenv("RAILWAY_DATABASE_URL")
     
-    # Railway's internal database URL (if using Railway's managed PostgreSQL)
-    RAILWAY_DATABASE_URL: Optional[str] = os.getenv("DATABASE_URL")
-    
-    # Fallback to individual components if DATABASE_URL not provided
-    POSTGRES_SERVER: str = os.getenv("PGHOST") or os.getenv("POSTGRES_SERVER") or "db"
+    # Individual database components (for building URL if needed)
+    POSTGRES_SERVER: str = os.getenv("PGHOST") or os.getenv("POSTGRES_HOSTNAME") or "db"
     POSTGRES_USER: str = os.getenv("PGUSER") or os.getenv("POSTGRES_USER") or "postgres"
     POSTGRES_PASSWORD: str = os.getenv("PGPASSWORD") or os.getenv("POSTGRES_PASSWORD") or ""
     POSTGRES_DB: str = os.getenv("PGDATABASE") or os.getenv("POSTGRES_DB") or "railway"
@@ -75,16 +73,26 @@ class Settings(BaseSettings):
     # Force SSL in production
     POSTGRES_QUERY: str = "sslmode=require" if RAILWAY_ENVIRONMENT == "production" else ""
     
-    # Additional debug info
     def __init__(self, **values):
         super().__init__(**values)
-        print("\n[Config] Current database configuration:", flush=True)
+        # Debug print all database-related environment variables
+        print("\n[Config] Database Environment Variables:", flush=True)
+        for key, value in os.environ.items():
+            if any(k in key.upper() for k in ['POSTGRES', 'DATABASE', 'PG']):
+                print(f"  {key}: {value}", flush=True)
+        
+        print("\n[Config] Final Database Configuration:", flush=True)
         print(f"  DATABASE_URL: {self.DATABASE_URL}", flush=True)
-        print(f"  RAILWAY_DATABASE_URL: {self.RAILWAY_DATABASE_URL}", flush=True)
         print(f"  POSTGRES_SERVER: {self.POSTGRES_SERVER}", flush=True)
         print(f"  POSTGRES_USER: {self.POSTGRES_USER}", flush=True)
         print(f"  POSTGRES_DB: {self.POSTGRES_DB}", flush=True)
         print(f"  POSTGRES_PORT: {self.POSTGRES_PORT}", flush=True)
+        print(f"  RAILWAY_ENVIRONMENT: {self.RAILWAY_ENVIRONMENT}", flush=True)
+        
+        # Print CORS configuration
+        print("\n[Config] CORS Configuration:", flush=True)
+        print(f"  FRONTEND_URL: {os.getenv('FRONTEND_URL')}", flush=True)
+        print(f"  BACKEND_CORS_ORIGINS: {self.BACKEND_CORS_ORIGINS}", flush=True)
         print(f"  RAILWAY_ENVIRONMENT: {self.RAILWAY_ENVIRONMENT}", flush=True)
     
     @validator("DATABASE_URL", pre=True)

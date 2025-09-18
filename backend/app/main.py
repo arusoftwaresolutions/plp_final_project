@@ -1,11 +1,13 @@
 import os
 from contextlib import asynccontextmanager
+from collections.abc import AsyncGenerator
 from datetime import datetime, timedelta
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 
-from fastapi import FastAPI, Depends, HTTPException
+from fastapi import FastAPI, Depends, HTTPException, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
 from fastapi.responses import JSONResponse
 from dotenv import load_dotenv
 import traceback
