@@ -1,7 +1,22 @@
 import os
 import sys
 
-PORT = int(os.getenv("PORT", "8000"))
+def safe_port(port_str: str, default: int = 8000) -> int:
+    """Safely convert a port string to an integer, handling masked values."""
+    if not port_str or '*****' in port_str:
+        print(f"[Launcher] Using default port {default} due to missing or masked PORT")
+        return default
+    try:
+        port = int(port_str)
+        if 1 <= port <= 65535:
+            return port
+        print(f"[Launcher] Port {port} out of range, using default {default}")
+    except (ValueError, TypeError):
+        print(f"[Launcher] Invalid port '{port_str}', using default {default}")
+    return default
+
+# Get port from environment variable with safe handling
+PORT = safe_port(os.getenv("PORT"), 8000)
 HOST = "0.0.0.0"
 
 try:
