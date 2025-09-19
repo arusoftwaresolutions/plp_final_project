@@ -46,7 +46,8 @@ class Settings(BaseSettings):
         db_name = os.getenv("PGDATABASE")
         
         if all([db_host, db_user, db_password, db_name]):
-            DATABASE_URL = f"postgresql+asyncpg://{db_user}:{db_password}@{db_host}:{db_port}/{db_name}"
+            # Use psycopg3 driver for async operations
+            DATABASE_URL = f"postgresql+psycopg://{db_user}:{db_password}@{db_host}:{db_port}/{db_name}"
         else:
             # Fallback to local development database
             DATABASE_URL = "postgresql+asyncpg://postgres:postgres@localhost:5432/sdg"
