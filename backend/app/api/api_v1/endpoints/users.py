@@ -3,10 +3,10 @@ from typing import Any, List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app import models, schemas
-from app.api import deps
-from app.db.session import get_db
-from app.services import user as user_service
+from backend.app import models, schemas
+from backend.app.api.deps import get_current_active_user, get_current_active_superuser
+from backend.app.db.session import get_db
+from backend.app.services import user as user_service
 
 router = APIRouter()
 
@@ -15,7 +15,7 @@ async def read_users(
     db: AsyncSession = Depends(get_db),
     skip: int = 0,
     limit: int = 100,
-    current_user: models.User = Depends(deps.get_current_active_superuser),
+    current_user: models.User = Depends(get_current_active_superuser),
 ) -> Any:
     """
     Retrieve users.
@@ -28,7 +28,7 @@ async def create_user(
     *,
     db: AsyncSession = Depends(get_db),
     user_in: schemas.UserCreate,
-    current_user: models.User = Depends(deps.get_current_active_superuser),
+    current_user: models.User = Depends(get_current_active_superuser),
 ) -> Any:
     """
     Create new user.
@@ -47,7 +47,7 @@ async def update_user_me(
     *,
     db: AsyncSession = Depends(get_db),
     user_in: schemas.UserUpdate,
-    current_user: models.User = Depends(deps.get_current_active_user),
+    current_user: models.User = Depends(get_current_active_user),
 ) -> Any:
     """
     Update own user.
@@ -57,7 +57,7 @@ async def update_user_me(
 
 @router.get("/me", response_model=schemas.UserResponse)
 async def read_user_me(
-    current_user: models.User = Depends(deps.get_current_active_user),
+    current_user: models.User = Depends(get_current_active_user),
 ) -> Any:
     """
     Get current user.
@@ -67,7 +67,7 @@ async def read_user_me(
 @router.get("/{user_id}", response_model=schemas.UserResponse)
 async def read_user_by_id(
     user_id: int,
-    current_user: models.User = Depends(deps.get_current_active_user),
+    current_user: models.User = Depends(get_current_active_user),
     db: AsyncSession = Depends(get_db),
 ) -> Any:
     """
@@ -88,7 +88,7 @@ async def update_user(
     db: AsyncSession = Depends(get_db),
     user_id: int,
     user_in: schemas.UserUpdate,
-    current_user: models.User = Depends(deps.get_current_active_superuser),
+    current_user: models.User = Depends(get_current_active_superuser),
 ) -> Any:
     """
     Update a user.
@@ -107,7 +107,7 @@ async def delete_user(
     *,
     db: AsyncSession = Depends(get_db),
     user_id: int,
-    current_user: models.User = Depends(deps.get_current_active_superuser),
+    current_user: models.User = Depends(get_current_active_superuser),
 ) -> Any:
     """
     Delete a user.
