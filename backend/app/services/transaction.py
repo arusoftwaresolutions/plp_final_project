@@ -5,8 +5,8 @@ from sqlalchemy import select, func, and_, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.models import Transaction, User, TransactionCategory, TransactionType
-from app.schemas.transaction import (
+from backend.app.models import Transaction, User, TransactionCategory, TransactionType
+from backend.app.schemas.transaction import (
     TransactionCreate, 
     TransactionUpdate, 
     TransactionSummary,
@@ -14,8 +14,8 @@ from app.schemas.transaction import (
     TransactionCategoryCreate,
     TransactionCategoryUpdate
 )
-from app.services.base import CRUDBase
-from app.core.exceptions import (
+from backend.app.services.base import CRUDBase
+from backend.app.core.exceptions import (
     InsufficientFundsError,
     TransactionError
 )
