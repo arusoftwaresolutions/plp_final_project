@@ -10,7 +10,7 @@ python-multipart>=0.0.6
 # Database
 sqlalchemy[asyncio]>=2.0.23
 alembic>=1.12.1
-psycopg-binary>=3.2.0  # Using pre-built binary instead of building from source
+psycopg[binary]>=3.2.1  # Use psycopg3 binary wheels (no Rust build)
 
 # Authentication and Security
 python-jose[cryptography]>=3.3.0
