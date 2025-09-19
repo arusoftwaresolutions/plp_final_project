@@ -11,20 +11,39 @@ services:
     # Build and install dependencies with cache clearing
     buildCommand: |
       # Clear Python cache and build artifacts
+      echo "=== Starting build process ==="
+      echo "=== Cleaning up build artifacts..."
       find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
       find . -type f -name "*.py[co]" -delete
       rm -rf build/ dist/ *.egg-info/ .pytest_cache/ .mypy_cache/
       
       # Clear pip cache and update pip
+      echo "=== Updating pip and setuptools..."
       python -m pip cache purge || true
-      python -m pip install --upgrade pip setuptools wheel
+      python -m pip install --upgrade "pip>=24.0" "setuptools>=69.0.3" "wheel>=0.42.0"
       
-      # Install package in development mode and requirements using only binary wheels
-      pip install --only-binary :all: --no-cache-dir -e .
-      pip install --only-binary :all: --no-cache-dir -r requirements.txt
+      # Create a temporary requirements file with --only-binary for each package
+      echo "=== Preparing installation with binary wheels only..."
+      echo "--only-binary :all:" > /tmp/requirements.txt
+      cat requirements.txt | grep -v "^#" | grep -v "^$" | sed 's/^/--only-binary :all: /' >> /tmp/requirements.txt
+      
+      # Install requirements with detailed logging
+      echo "=== Installing requirements..."
+      pip install --no-cache-dir -r /tmp/requirements.txt -v
+      
+      # Install in development mode with --no-deps to avoid recompilation
+      echo "=== Installing package in development mode..."
+      pip install --no-deps -e .
       
       # Verify all packages were installed from wheels
+      echo "=== Verifying installations..."
       pip list --format=freeze
+      
+      # Check for any packages that might have been built from source
+      echo "=== Checking for source builds..."
+      find $VIRTUAL_ENV/lib/python*/site-packages -name "*.so" -o -name "*.pyd" | while read file; do
+        echo "Found compiled extension: $file"
+      done
       
     # Start command - using the main module path
     startCommand: uvicorn backend.app.main:app --host 0.0.0.0 --port $PORT
