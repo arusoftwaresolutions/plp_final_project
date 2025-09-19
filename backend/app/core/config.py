@@ -1,5 +1,6 @@
-from pydantic import AnyHttpUrl, EmailStr, BaseSettings, validator
-from typing import List, Optional, Union
+from pydantic import AnyHttpUrl, EmailStr, Field, field_validator, ConfigDict
+from pydantic_settings import BaseSettings
+from typing import List, Optional, Union, Any
 import os
 from dotenv import load_dotenv
 
@@ -30,7 +31,8 @@ class Settings(BaseSettings):
     # CORS
     BACKEND_CORS_ORIGINS: List[AnyHttpUrl] = []
 
-    @validator("BACKEND_CORS_ORIGINS", pre=True)
+    @field_validator("BACKEND_CORS_ORIGINS", mode='before')
+    @classmethod
     def assemble_cors_origins(cls, v: Union[str, List[str]]) -> List[str]:
         if isinstance(v, str) and not v.startswith("["):
             v = [i.strip() for i in v.split(",")]
@@ -93,7 +95,11 @@ class Settings(BaseSettings):
     # AI Settings
     AI_MODEL_PATH: str = os.getenv("AI_MODEL_PATH", "models/budget_recommender.joblib")
 
-    class Config:
-        case_sensitive = True
+    model_config = ConfigDict(
+        case_sensitive=True,
+        env_file=".env",
+        env_file_encoding="utf-8",
+        extra="ignore"
+    )
 
 settings = Settings()
