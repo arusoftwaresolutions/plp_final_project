@@ -9,7 +9,7 @@ python-multipart==0.0.6
 # Database
 sqlalchemy[asyncio]==2.0.15
 alembic==1.10.3
-psycopg[binary,pool]==3.1.9  # Async PostgreSQL driver with connection pooling
+psycopg[binary,pool]==3.2.10  # Async PostgreSQL driver with connection pooling
 
 # Authentication and Security
 python-jose[cryptography]==3.3.0
