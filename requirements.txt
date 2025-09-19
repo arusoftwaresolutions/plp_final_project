@@ -4,22 +4,25 @@ setuptools>=75.1
 wheel>=0.44
 
 # Core dependencies
-fastapi>=0.109.0
-uvicorn[standard]>=0.27.0
-gunicorn>=21.2.0
-python-dotenv>=1.0.0
-pydantic>=2.5.0
-pydantic-settings>=2.0.0
-python-multipart>=0.0.6
+fastapi==0.110.0  # Pinned to specific version with pre-built wheels
+uvicorn[standard]==0.27.1  # Pinned to specific version with pre-built wheels
+gunicorn==21.2.0
+python-dotenv==1.0.0
+pydantic==2.7.1  # Pinned to specific version with pre-built wheels
+pydantic-settings==2.2.1  # Pinned to specific version with pre-built wheels
+python-multipart==0.0.9  # Pinned to specific version with pre-built wheels
 
 # Database
-sqlalchemy[asyncio]>=2.0.23
-alembic>=1.12.1
-psycopg[binary]>=3.2.1  # Use psycopg3 binary wheels (no Rust build)
+sqlalchemy[asyncio]==2.0.29  # Pinned to specific version with pre-built wheels
+alembic==1.13.1  # Pinned to specific version with pre-built wheels
+psycopg-binary==3.2.3  # Using pre-built binary instead of source build
 
 # Authentication and Security
-python-jose[cryptography]>=3.3.0
-passlib[bcrypt]>=1.7.4
+python-jose[cryptography]==3.3.0  # Pinned to specific version with pre-built wheels
+passlib[bcrypt]==1.7.4  # Pinned to specific version with pre-built wheels
+
+# Add any other dependencies below with specific versions
+# to ensure consistent builds and avoid source compilation
 bcrypt>=4.0.1
 
 # Utilities

@@ -13,12 +13,16 @@ services:
       find . -type f -name "*.py[co]" -delete
       rm -rf build/ dist/ *.egg-info/ .pytest_cache/ .mypy_cache/
       
-      # Clear pip cache and install dependencies
+      # Clear pip cache and update pip
       python -m pip cache purge || true
+      python -m pip install --upgrade pip setuptools wheel
       
-      # Install package in development mode and requirements
-      pip install --no-cache-dir -e .
-      pip install --no-cache-dir -r requirements.txt
+      # Install package in development mode and requirements using only binary wheels
+      pip install --only-binary :all: --no-cache-dir -e .
+      pip install --only-binary :all: --no-cache-dir -r requirements.txt
+      
+      # Verify all packages were installed from wheels
+      pip list --format=freeze
       
     # Start command - using the main module path
     startCommand: uvicorn backend.app.main:app --host 0.0.0.0 --port $PORT
