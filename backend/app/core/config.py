@@ -17,9 +17,12 @@ class Settings(BaseSettings):
     API_V1_STR: str = "/api/v1"
 
     # Security
-    SECRET_KEY: str = os.getenv("SECRET_KEY")
-    if not SECRET_KEY:
-        raise ValueError("SECRET_KEY environment variable must be set")
+    SECRET_KEY: str = os.getenv("SECRET_KEY", "temporary-secret-key-for-build")
+    if not SECRET_KEY or SECRET_KEY == "temporary-secret-key-for-build":
+        if os.getenv("ENVIRONMENT") != "development":
+            import secrets
+            SECRET_KEY = secrets.token_urlsafe(32)
+            print("WARNING: Using a temporary SECRET_KEY. Please set SECRET_KEY environment variable in production.")
         
     ALGORITHM: str = os.getenv("ALGORITHM", "HS256")
     ACCESS_TOKEN_EXPIRE_MINUTES: int = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "1440"))

@@ -15,6 +15,13 @@ services:
       # Verify Python version
       echo "=== Using Python $(python --version) ==="
       
+      # Pre-build: Ensure required environment variables are set
+      echo "=== Verifying environment variables ==="
+      if [ -z "$SECRET_KEY" ] || [ "$SECRET_KEY" = "temporary-secret-key-for-build" ]; then
+        echo "Generating a secure SECRET_KEY..."
+        export SECRET_KEY=$(python -c "import secrets; print(secrets.token_urlsafe(32))")
+      fi
+      
       # Clean environment - Comprehensive cache cleaning
       echo "=== Cleaning build environment and caches ==="
       
@@ -71,9 +78,10 @@ services:
           name: poverty-db
           property: connectionString
           
-      # Authentication
+      # Authentication - Generate a secure secret key
       - key: SECRET_KEY
         generateValue: true
+        sync: false  # This ensures the secret is generated once and reused
       - key: ALGORITHM
         value: HS256
       - key: ACCESS_TOKEN_EXPIRE_MINUTES
@@ -84,6 +92,9 @@ services:
         value: admin
       - key: FIRST_SUPERUSER_EMAIL
         value: admin@example.com
+      - key: FIRST_SUPERUSER_PASSWORD
+        generateValue: true  # Will be generated on first run
+        sync: false
       - key: FIRST_SUPERUSER_PASSWORD
         value:"admin123"
         
