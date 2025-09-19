@@ -3,8 +3,8 @@ from typing import List, Optional, Dict, Any
 from sqlalchemy import select, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models import Notification, User, UserNotificationPreference
-from app.schemas.notification import (
+from backendapp.models import Notification, User, UserNotificationPreference
+from backend.app.schemas.notification import (
     NotificationCreate,
     NotificationUpdate,
     NotificationPreferenceUpdate,

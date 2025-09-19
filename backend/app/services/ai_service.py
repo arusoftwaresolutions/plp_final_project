@@ -12,15 +12,15 @@ from sqlalchemy import select, func, and_, or_, case
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload, joinedload
 
-from app.models import (
+from backend.app.models import (
     User, Transaction, TransactionCategory, MicroLoan,
     CrowdFundingCampaign, PovertyArea, Notification
 )
-from app.schemas.ai import (
+from backend.app.schemas.ai import (
     BudgetRecommendation, BudgetCategory, CampaignRecommendation,
     LoanEligibility, PovertyInsight, UserFinancialProfile
 )
-from app.core.config import settings
+from backendapp.core.config import settings
 
 logger = logging.getLogger(__name__)
 

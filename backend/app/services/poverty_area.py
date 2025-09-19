@@ -5,16 +5,16 @@ from sqlalchemy import select, func, and_, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.models import PovertyArea, User, Transaction, TransactionType
-from app.schemas.poverty_area import (
+from backend.app.models import PovertyArea, User, Transaction, TransactionType
+from backend.app.schemas.poverty_area import (
     PovertyAreaCreate,
     PovertyAreaUpdate,
     PovertyStatsSummary,
     PovertyNeedsAnalysis,
     PovertyAreaFilter
 )
-from app.services.base import CRUDBase
-from app.core.exceptions import ValidationError
+from backend.app.services.base import CRUDBase
+from backend.app.core.exceptions import ValidationError
 
 class CRUDPovertyArea(CRUDBase[PovertyArea, PovertyAreaCreate, PovertyAreaUpdate]):
     """Poverty Area CRUD operations."""

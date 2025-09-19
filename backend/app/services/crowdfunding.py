@@ -5,14 +5,14 @@ from sqlalchemy import select, func, and_, or_, case
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.models import (
+from backend.app.models import (
     CrowdFundingCampaign, 
     Donation, 
     User,
     Transaction,
     TransactionType
 )
-from app.schemas.crowdfunding import (
+from backend.app.schemas.crowdfunding import (
     CampaignCreate,
     CampaignUpdate,
     CampaignStatus,
@@ -21,8 +21,8 @@ from app.schemas.crowdfunding import (
     DonorLeaderboard,
     CampaignSearchFilter
 )
-from app.services.base import CRUDBase
-from app.core.exceptions import CampaignError, ValidationError
+from backend.app.services.base import CRUDBase
+from backend.app.core.exceptions import CampaignError, ValidationError
 
 class CRUDCampaign(CRUDBase[CrowdFundingCampaign, CampaignCreate, CampaignUpdate]):
     """Crowdfunding Campaign CRUD operations."""

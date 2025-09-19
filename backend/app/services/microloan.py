@@ -5,13 +5,13 @@ from sqlalchemy import select, func, and_, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.models import MicroLoan, LoanRepayment, User, Transaction
-from app.schemas.microloan import (
+from backend.app.models import MicroLoan, LoanRepayment, User, Transaction
+from backend.app.schemas.microloan import (
     MicroLoanCreate, MicroLoanUpdate, MicroLoanApprove, MicroLoanReject,
     LoanRepaymentCreate, LoanSummary, LoanRepaymentSchedule
 )
-from app.services.base import CRUDBase
-from app.core.exceptions import LoanError, InsufficientFundsError
+from backend.app.services.base import CRUDBase
+from backend.app.core.exceptions import LoanError, InsufficientFundsError
 
 class CRUDMicroLoan(CRUDBase[MicroLoan, MicroLoanCreate, MicroLoanUpdate]):
     """MicroLoan CRUD operations."""
