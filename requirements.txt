@@ -10,7 +10,7 @@ python-multipart>=0.0.6
 # Database
 sqlalchemy[asyncio]>=2.0.23
 alembic>=1.12.1
-psycopg[binary,pool]>=3.2.0  # Async PostgreSQL driver with connection pooling
+psycopg-binary>=3.2.0  # Using pre-built binary instead of building from source
 
 # Authentication and Security
 python-jose[cryptography]>=3.3.0
@@ -20,8 +20,6 @@ bcrypt>=4.0.1
 # Utilities
 email-validator>=2.0.0
 python-dateutil>=2.8.2
-
-# API Documentation
 
 # Development
 pytest>=8.0.0
