@@ -68,21 +68,27 @@ class Settings(BaseSettings):
         elif not db_url.startswith("postgresql+asyncpg://"):
             db_url = db_url.replace("postgresql://", "postgresql+asyncpg://", 1)
         
-        # Handle SSL for production - use ssl=require instead of sslmode=require for asyncpg
-        if self.ENVIRONMENT == "production":
-            # Remove any existing sslmode parameters
-            if 'sslmode=' in db_url:
-                if '?' in db_url:
-                    base, params = db_url.split('?', 1)
-                    params = [p for p in params.split('&') if not p.startswith('sslmode=')]
-                    db_url = f"{base}?{'&'.join(params)}"
-                else:
-                    db_url = db_url.split('?')[0]
-            
-            # Add ssl=require if not present
-            if 'ssl=' not in db_url:
-                separator = '?' if '?' not in db_url else '&'
-                db_url = f"{db_url}{separator}ssl=require"
+        # Parse the URL to handle query parameters properly
+        from urllib.parse import urlparse, parse_qs, urlunparse
+        
+        parsed = urlparse(db_url)
+        query_params = parse_qs(parsed.query)
+        
+        # Remove any unsupported parameters for asyncpg
+        for param in ['sslmode', 'connect_timeout', 'timeout']:
+            if param in query_params:
+                del query_params[param]
+        
+        # Handle SSL for production
+        if self.ENVIRONMENT == "production" and 'ssl' not in query_params:
+            query_params['ssl'] = ['require']
+        
+        # Rebuild the URL with filtered parameters
+        filtered_query = '&'.join(
+            f"{k}={v[0]}" for k, v in query_params.items()
+        ) if query_params else ''
+        
+        db_url = urlunparse(parsed._replace(query=filtered_query))
         
         # Redact password in logs
         if '@' in db_url:
