@@ -1,0 +1,23 @@
+# Render configuration for SDG Frontend (Streamlit)
+services:
+  - type: web
+    name: sdg-frontend
+    env: python
+    python:
+      version: 3.9.0
+    region: oregon
+    plan: free
+    buildCommand: |
+      pip install --upgrade pip
+      pip install -r requirements.txt
+    startCommand: streamlit run src/app.py --server.port=$PORT --server.address=0.0.0.0
+    envVars:
+      - key: PORT
+        value: 8501
+      - key: BACKEND_URL
+        value: https://your-backend-url.onrender.com  # Update this with your actual backend URL
+      - key: STREAMLIT_SERVER_HEADLESS
+        value: "true"
+      - key: STREAMLIT_SERVER_PORT
+        value: "8501"
+    healthCheckPath: /
