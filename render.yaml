@@ -8,63 +8,54 @@ services:
     region: oregon
     plan: free
     
-    # Build and install dependencies with cache clearing
+    # Python version is set in runtime.txt and pyproject.toml
+    
+    # Build command with comprehensive cache cleaning
     buildCommand: |
-      # Verify Python version first
-      echo "=== Verifying Python version ==="
-      python --version
-      python3 --version
-      which python
-      which python3
+      # Verify Python version
+      echo "=== Using Python $(python --version) ==="
       
-      # Ensure we're using the correct Python version
-      PYTHON_VERSION=$(python -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')")
-      if [ "$PYTHON_VERSION" != "3.12" ]; then
-        echo "ERROR: Wrong Python version: $PYTHON_VERSION. Expected 3.12"
-        exit 1
-      fi
+      # Clean environment - Comprehensive cache cleaning
+      echo "=== Cleaning build environment and caches ==="
       
-      # Clear Python cache and build artifacts
-      echo "=== Cleaning up build artifacts..."
+      # Python cache
+      echo "Cleaning Python cache..."
       find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
       find . -type f -name "*.py[co]" -delete
-      rm -rf build/ dist/ *.egg-info/ .pytest_cache/ .mypy_cache/
+      find . -type d -name "*.pyc" -exec rm -rf {} + 2>/dev/null || true
+      find . -type d -name "*.pyo" -exec rm -rf {} + 2>/dev/null || true
+      find . -type d -name "*__pycache__" -exec rm -rf {} + 2>/dev/null || true
       
-      # Clear pip cache and update pip
-      echo "=== Updating pip and setuptools..."
-      python -m pip cache purge || true
-      python -m pip install --upgrade "pip>=24.0" "setuptools>=69.0.3" "wheel>=0.42.0"
+      # Build and package cache
+      echo "Cleaning build artifacts..."
+      rm -rf build/ dist/ *.egg-info/ .pytest_cache/ .mypy_cache/ .coverage htmlcov/ .pytest_cache/ .mypy_cache/
       
-      # Install build dependencies first
-      echo "=== Installing build dependencies..."
-      python -m pip install --only-binary :all: --no-cache-dir setuptools-rust wheel
+      # Pip cache
+      echo "Cleaning pip cache..."
+      python -m pip cache purge 2>/dev/null || true
       
-      # Create a temporary requirements file with --only-binary for each package
-      echo "=== Preparing installation with binary wheels only..."
-      echo "--only-binary :all:" > /tmp/requirements.txt
-      cat requirements.txt | grep -v "^#" | grep -v "^$" | sed 's/^/--only-binary :all: /' >> /tmp/requirements.txt
+      # Node cache if exists
+      if [ -d "node_modules" ]; then
+        echo "Cleaning Node.js cache..."
+        rm -rf node_modules/ .npm/ .cache/
+      fi
       
-      # Install requirements with detailed logging and force Python 3.12
-      echo "=== Installing requirements..."
-      python -m pip install --only-binary :all: --no-cache-dir -r /tmp/requirements.txt -v --ignore-installed
+      # Install build dependencies with cache control
+      echo "=== Installing build dependencies ==="
+      python -m pip install --no-cache-dir --upgrade pip setuptools wheel
       
-      # Install in development mode with --no-deps to avoid recompilation
-      echo "=== Installing package in development mode..."
-      python -m pip install --no-deps -e .
+      # Install the package in development mode with cache control
+      echo "=== Installing package ==="
+      pip install --no-cache-dir --no-build-isolation -e .
       
-      # Verify all packages were installed from wheels
-      echo "=== Verifying installations..."
-      python -m pip list --format=freeze
+      # Clean up any remaining cache
+      echo "=== Final cleanup ==="
+      find /tmp -name "*.pyc" -delete 2>/dev/null || true
+      find /tmp -name "*.pyo" -delete 2>/dev/null || true
       
-      # Check for any packages that might have been built from source
-      echo "=== Checking for source builds..."
-      find $VIRTUAL_ENV/lib/python*/site-packages -name "*.so" -o -name "*.pyd" | while read file; do
-        echo "Found compiled extension: $file"
-      done
-      
-      # Verify no Rust-related packages are installed
-      echo "=== Checking for Rust-related packages..."
-      python -m pip list | grep -i 'rust\|cargo\|maturin' || echo "No Rust-related packages found"
+      # Verify installations
+      echo "=== Verifying installations ==="
+      pip list --format=freeze
       
     # Start command - using the main module path
     startCommand: uvicorn backend.app.main:app --host 0.0.0.0 --port $PORT

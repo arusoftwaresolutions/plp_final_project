@@ -1,42 +1,53 @@
-# Core dependencies with Python 3.12 compatibility
-fastapi==0.109.2  # Latest stable version with Python 3.12 support
-uvicorn[standard]==0.27.1
-gunicorn==21.2.0
-python-dotenv==1.0.0
-pydantic==2.6.4  # Latest stable version with Python 3.12 support
-pydantic-settings==2.1.0
-python-multipart==0.0.9
+# Core Dependencies (Pinned to Python 3.12 compatible versions)
+fastapi==0.109.1  # Latest stable with Python 3.12 support
+uvicorn[standard]==0.27.0  # Web server with WebSocket support
+python-dotenv==1.0.0  # Environment variable management
+python-multipart==0.0.6  # For file uploads
 
-# Database
-sqlalchemy[asyncio]==2.0.29
-alembic==1.13.1
-psycopg-binary==3.2.3  # Pre-built binary for PostgreSQL
+# Database (Using pure Python drivers)
+sqlalchemy[asyncio]==2.0.25  # ORM with async support
+alembic==1.13.0  # Database migrations
+asyncpg==0.28.0  # Async PostgreSQL driver (pure Python)
+psycopg2-binary==2.9.9  # Fallback PostgreSQL driver
 
-# Authentication and Security
-python-jose[cryptography]==3.3.0
-passlib[bcrypt]==1.7.4
-bcrypt==4.1.2  # Pinned specific version for Python 3.12
-cryptography>=42.0.5
+# Authentication & Security
+passlib[bcrypt]==1.7.4  # Password hashing
+PyJWT==2.8.0  # JWT token handling
+cryptography==41.0.7  # Required for PyJWT with RSA
+python-jose[cryptography]==3.3.0  # JOSE implementation
+
+# Data Validation & Serialization
+pydantic==2.5.3  # Data validation
+pydantic-settings==2.1.0  # Settings management
+email-validator==2.1.0.post1  # Email validation
+
+# Async & Concurrency
+anyio==3.7.1  # Async I/O
+asgiref==3.7.2  # ASGI support
 
 # Utilities
-email-validator==2.1.0.post1
-python-dateutil==2.8.2
+python-dateutil==2.8.2  # Date handling
+python-slugify==8.0.1  # URL-safe string conversion
+PyYAML==6.0.1  # YAML parsing
 
-# Runtime dependencies
-anyio==4.3.0
-click==8.1.7
-h11==0.14.0
-idna==3.6
-sniffio==1.3.0
-typing-extensions==4.10.0
+# Development Dependencies (Not needed in production)
+pytest==7.4.3  # Testing framework
+pytest-asyncio==0.21.1  # Async test support
+httpx==0.25.2  # HTTP client for testing
 
-# Development (not needed in production)
-pytest==8.0.2
-pytest-asyncio==0.23.5
-httpx==0.27.0
-structlog==24.1.0
+# Build & Package Management
+setuptools==68.2.2
+wheel==0.42.0
+pip==23.3.1
 
-# Ensure these are up to date for Python 3.12
-pip>=24.0
-setuptools>=69.0.3
-wheel>=0.42.0
+# Runtime Dependencies
+click==8.1.7  # Command line interface
+h11==0.14.0  # HTTP/1.1 client/server
+idna==3.6  # Internationalized Domain Names
+sniffio==1.3.0  # Async library autodetection
+typing-extensions==4.8.0  # Type hints support
+
+# Web Framework Extras
+jinja2==3.1.2  # Templating engine
+itsdangerous==2.1.2  # Security helpers
+markupsafe==2.1.3  # HTML/XML string library
