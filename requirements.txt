@@ -1,27 +1,24 @@
 # Core dependencies
-fastapi==0.109.1
-uvicorn[standard]==0.27.1
-gunicorn==21.2.0
+fastapi==0.95.2
+uvicorn[standard]==0.22.0
+gunicorn==20.1.0
 python-dotenv==1.0.0
-pydantic==1.10.13
-python-multipart==0.0.9
+pydantic==1.10.7
+python-multipart==0.0.6
 
 # Database
-sqlalchemy[asyncio]==2.0.25
-alembic==1.13.1
-psycopg[binary,pool]==3.2.10  # Async PostgreSQL driver with connection pooling
+sqlalchemy[asyncio]==2.0.15
+alembic==1.10.3
+psycopg[binary,pool]==3.1.9  # Async PostgreSQL driver with connection pooling
 
 # Authentication and Security
 python-jose[cryptography]==3.3.0
 passlib[bcrypt]==1.7.4
-python-multipart==0.0.9
-python-jose[cryptography]==3.3.0
-bcrypt==4.1.2
+bcrypt==4.0.1
 
 # Utilities
-email-validator==2.1.0.post1
+email-validator==1.3.1
 python-dateutil==2.8.2
-python-multipart==0.0.9
 
 # API Documentation
 
