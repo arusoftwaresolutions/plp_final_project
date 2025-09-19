@@ -2,6 +2,10 @@ from typing import Optional
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from backend.app.core.config import settings
+
+# Import and include API router after app creation to avoid circular imports
+from backend.app.api.api_v1.api import api_router
 
 # Create app first
 app = FastAPI(title="Poverty Alleviation Platform API")
@@ -14,6 +18,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Include API router
+app.include_router(api_router, prefix=settings.API_V1_STR)
 
 # Safe int parser to handle masked values and other edge cases
 def safe_int(val: Optional[str], default: int) -> int:
@@ -157,14 +164,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Import and include API router after app creation to avoid circular imports
-from backend.app.api.api_v1.api import api_router
-app.include_router(api_router, prefix=settings.API_V1_STR)
-
-# Import and include API router after app creation
-from backend.app.api.api_v1.api import api_router
-from backend.app.core.config import settings
-app.include_router(api_router, prefix=settings.API_V1_STR)
 
 # Health check endpoint
 @app.get("/health")
