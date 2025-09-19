@@ -10,8 +10,21 @@ services:
     
     # Build and install dependencies with cache clearing
     buildCommand: |
+      # Verify Python version first
+      echo "=== Verifying Python version ==="
+      python --version
+      python3 --version
+      which python
+      which python3
+      
+      # Ensure we're using the correct Python version
+      PYTHON_VERSION=$(python -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')")
+      if [ "$PYTHON_VERSION" != "3.12" ]; then
+        echo "ERROR: Wrong Python version: $PYTHON_VERSION. Expected 3.12"
+        exit 1
+      fi
+      
       # Clear Python cache and build artifacts
-      echo "=== Starting build process ==="
       echo "=== Cleaning up build artifacts..."
       find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
       find . -type f -name "*.py[co]" -delete
@@ -22,28 +35,36 @@ services:
       python -m pip cache purge || true
       python -m pip install --upgrade "pip>=24.0" "setuptools>=69.0.3" "wheel>=0.42.0"
       
+      # Install build dependencies first
+      echo "=== Installing build dependencies..."
+      python -m pip install --only-binary :all: --no-cache-dir setuptools-rust wheel
+      
       # Create a temporary requirements file with --only-binary for each package
       echo "=== Preparing installation with binary wheels only..."
       echo "--only-binary :all:" > /tmp/requirements.txt
       cat requirements.txt | grep -v "^#" | grep -v "^$" | sed 's/^/--only-binary :all: /' >> /tmp/requirements.txt
       
-      # Install requirements with detailed logging
+      # Install requirements with detailed logging and force Python 3.12
       echo "=== Installing requirements..."
-      pip install --no-cache-dir -r /tmp/requirements.txt -v
+      python -m pip install --only-binary :all: --no-cache-dir -r /tmp/requirements.txt -v --ignore-installed
       
       # Install in development mode with --no-deps to avoid recompilation
       echo "=== Installing package in development mode..."
-      pip install --no-deps -e .
+      python -m pip install --no-deps -e .
       
       # Verify all packages were installed from wheels
       echo "=== Verifying installations..."
-      pip list --format=freeze
+      python -m pip list --format=freeze
       
       # Check for any packages that might have been built from source
       echo "=== Checking for source builds..."
       find $VIRTUAL_ENV/lib/python*/site-packages -name "*.so" -o -name "*.pyd" | while read file; do
         echo "Found compiled extension: $file"
       done
+      
+      # Verify no Rust-related packages are installed
+      echo "=== Checking for Rust-related packages..."
+      python -m pip list | grep -i 'rust\|cargo\|maturin' || echo "No Rust-related packages found"
       
     # Start command - using the main module path
     startCommand: uvicorn backend.app.main:app --host 0.0.0.0 --port $PORT
@@ -73,7 +94,7 @@ services:
       - key: FIRST_SUPERUSER_EMAIL
         value: admin@example.com
       - key: FIRST_SUPERUSER_PASSWORD
-        generateValue: true
+        value:"admin123"
         
       # CORS - update with your frontend URL
       - key: BACKEND_CORS_ORIGINS
