@@ -68,25 +68,21 @@ class Settings(BaseSettings):
         elif not db_url.startswith("postgresql+asyncpg://"):
             db_url = db_url.replace("postgresql://", "postgresql+asyncpg://", 1)
         
-        # Handle SSL for production - ensure sslmode is properly formatted
+        # Handle SSL for production - use ssl=require instead of sslmode=require for asyncpg
         if self.ENVIRONMENT == "production":
-            if 'sslmode=' not in db_url:
-                db_url += '?sslmode=require' if '?' not in db_url else '&sslmode=require'
-            # Ensure the sslmode parameter is properly formatted
-            db_url = db_url.replace('?sslmode=', '?sslmode=')
-            db_url = db_url.replace('&sslmode=', '&sslmode=')
-        
-        # Ensure the URL is properly formatted for asyncpg
-        if 'postgresql+asyncpg://' in db_url and 'sslmode=' in db_url:
-            # Make sure sslmode is the first parameter if there are multiple
-            if '?' in db_url and '&' in db_url:
-                base, params = db_url.split('?', 1)
-                params = params.split('&')
-                # Move sslmode to the front
-                sslmode = [p for p in params if p.startswith('sslmode=')][0]
-                params.remove(sslmode)
-                params.insert(0, sslmode)
-                db_url = f"{base}?{'&'.join(params)}"
+            # Remove any existing sslmode parameters
+            if 'sslmode=' in db_url:
+                if '?' in db_url:
+                    base, params = db_url.split('?', 1)
+                    params = [p for p in params.split('&') if not p.startswith('sslmode=')]
+                    db_url = f"{base}?{'&'.join(params)}"
+                else:
+                    db_url = db_url.split('?')[0]
+            
+            # Add ssl=require if not present
+            if 'ssl=' not in db_url:
+                separator = '?' if '?' not in db_url else '&'
+                db_url = f"{db_url}{separator}ssl=require"
         
         # Redact password in logs
         if '@' in db_url:
