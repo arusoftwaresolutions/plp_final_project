@@ -4,10 +4,10 @@ from typing import Any, List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app import models, schemas
-from app.api import deps
-from app.db.session import get_db
-from app.services import crowdfunding as crowdfunding_service
+from backend.app import models, schemas
+from backend.app.api import deps
+from backend.app.db.session import get_db
+from backend.app.services import crowdfunding as crowdfunding_service
 
 router = APIRouter()
 
