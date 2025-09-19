@@ -19,6 +19,19 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Root endpoint
+@app.get("/")
+async def root():
+    return {
+        "message": "Welcome to the Poverty Alleviation Platform API",
+        "documentation": {
+            "swagger": "/docs",
+            "redoc": "/redoc"
+        },
+        "status": "operational",
+        "version": "1.0.0"
+    }
+
 # Include API router
 app.include_router(api_router, prefix=settings.API_V1_STR)
 
@@ -37,17 +50,248 @@ def safe_int(val: Optional[str], default: int) -> int:
 
 async def init_db():
     """Initialize the database with sample data."""
+    from datetime import datetime, timedelta
+    import json
+    from sqlalchemy import select
+    from sqlalchemy.orm import joinedload
+    from backend.app.db.models import (
+        Role, User, Transaction, TransactionType, TransactionCategory,
+        MicroLoan, LoanStatus, LoanRepayment, CrowdFundingCampaign,
+        Donation, PovertyArea, Notification, NotificationType,
+        UserNotificationPreference
+    )
+    from passlib.context import CryptContext
+    
+    pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+    
     try:
         async with AsyncSessionLocal() as db:
             # Check if we already have data
             result = await db.execute(select(Role).limit(1))
             if result.scalars().first() is not None:
-                return  # Database already initialized
+                print("Database already initialized, skipping sample data creation")
+                return
 
+            print("Creating sample data...")
+            
             # Create roles
             admin_role = Role(name="admin", description="Administrator with full access")
             user_role = Role(name="user", description="Regular user")
             donor_role = Role(name="donor", description="Donor user")
+            
+            db.add_all([admin_role, user_role, donor_role])
+            await db.commit()
+            await db.refresh(admin_role)
+            await db.refresh(user_role)
+            await db.refresh(donor_role)
+            
+            # Create admin user
+            admin_user = User(
+                username="admin",
+                email="admin@example.com",
+                hashed_password=pwd_context.hash("admin123"),
+                full_name="Admin User",
+                is_verified=True,
+                is_active=True
+            )
+            admin_user.roles = [admin_role, user_role, donor_role]
+            
+            # Create regular users
+            user1 = User(
+                username="john_doe",
+                email="john@example.com",
+                hashed_password=pwd_context.hash("password123"),
+                full_name="John Doe",
+                is_verified=True,
+                is_active=True
+            )
+            user1.roles = [user_role]
+            
+            user2 = User(
+                username="jane_smith",
+                email="jane@example.com",
+                hashed_password=pwd_context.hash("password123"),
+                full_name="Jane Smith",
+                is_verified=True,
+                is_active=True
+            )
+            user2.roles = [user_role, donor_role]
+            
+            db.add_all([admin_user, user1, user2])
+            await db.commit()
+            
+            # Create transactions
+            today = datetime.utcnow()
+            transactions = [
+                Transaction(
+                    user=admin_user,
+                    amount=1500.00,
+                    transaction_type=TransactionType.INCOME,
+                    category=TransactionCategory.SALARY,
+                    description="Monthly salary",
+                    date=today - timedelta(days=5)
+                ),
+                Transaction(
+                    user=user1,
+                    amount=1200.00,
+                    transaction_type=TransactionType.INCOME,
+                    category=TransactionCategory.SALARY,
+                    description="Monthly salary",
+                    date=today - timedelta(days=10)
+                ),
+                Transaction(
+                    user=user1,
+                    amount=150.00,
+                    transaction_type=TransactionType.EXPENSE,
+                    category=TransactionCategory.FOOD,
+                    description="Weekly groceries",
+                    date=today - timedelta(days=2)
+                ),
+                Transaction(
+                    user=user2,
+                    amount=200.00,
+                    transaction_type=TransactionType.SAVINGS,
+                    category=TransactionCategory.EMERGENCY_FUND,
+                    description="Monthly savings",
+                    date=today - timedelta(days=15)
+                )
+            ]
+            
+            db.add_all(transactions)
+            await db.commit()
+            
+            # Create microloans
+            loan1 = MicroLoan(
+                user=user1,
+                amount=1000.00,
+                purpose="Small business expansion",
+                status=LoanStatus.APPROVED,
+                interest_rate=0.1,
+                term_months=12,
+                disbursement_date=today - timedelta(days=30),
+                due_date=today + timedelta(days=335)
+            )
+            
+            loan2 = MicroLoan(
+                user=user2,
+                amount=2000.00,
+                purpose="Education fees",
+                status=LoanStatus.PENDING,
+                interest_rate=0.08,
+                term_months=6
+            )
+            
+            db.add_all([loan1, loan2])
+            await db.commit()
+            
+            # Create loan repayments
+            repayment1 = LoanRepayment(
+                loan=loan1,
+                amount=100.00,
+                payment_date=today - timedelta(days=5),
+                status="completed"
+            )
+            
+            db.add(repayment1)
+            await db.commit()
+            
+            # Create poverty areas
+            poverty_area1 = PovertyArea(
+                name="Rural Village A",
+                description="A small rural village with limited access to resources",
+                location=json.dumps({"latitude": 12.3456, "longitude": 98.7654, "address": "Rural Village A, Country"}),
+                poverty_rate=45.5,
+                population=1200,
+                needs=json.dumps(["clean water", "education", "healthcare"])
+            )
+            
+            poverty_area2 = PovertyArea(
+                name="Urban Slum B",
+                description="An urban slum with poor living conditions",
+                location=json.dumps({"latitude": 23.4567, "longitude": 87.6543, "address": "Urban Slum B, City"}),
+                poverty_rate=65.2,
+                population=3500,
+                needs=json.dumps(["housing", "sanitation", "employment"])
+            )
+            
+            db.add_all([poverty_area1, poverty_area2])
+            await db.commit()
+            
+            # Create crowdfunding campaigns
+            campaign1 = CrowdFundingCampaign(
+                title="Clean Water for Rural Village",
+                description="Help us provide clean drinking water to 100 families in Rural Village A",
+                target_amount=10000.00,
+                amount_raised=3500.00,
+                start_date=today - timedelta(days=30),
+                end_date=today + timedelta(days=60),
+                status="active",
+                image_url="https://example.com/water-campaign.jpg",
+                location=json.dumps({"latitude": 12.3456, "longitude": 98.7654, "address": "Rural Village A"}),
+                created_by=admin_user.id
+            )
+            
+            campaign2 = CrowdFundingCampaign(
+                title="Education for All",
+                description="Support education for children in Urban Slum B",
+                target_amount=15000.00,
+                amount_raised=5200.00,
+                start_date=today - timedelta(days=15),
+                end_date=today + timedelta(days=45),
+                status="active",
+                image_url="https://example.com/education-campaign.jpg",
+                location=json.dumps({"latitude": 23.4567, "longitude": 87.6543, "address": "Urban Slum B"}),
+                created_by=user2.id
+            )
+            
+            db.add_all([campaign1, campaign2])
+            await db.commit()
+            
+            # Create donations
+            donation1 = Donation(
+                campaign=campaign1,
+                donor=user2,
+                amount=250.00,
+                message="Happy to help with this great cause!",
+                is_anonymous=False
+            )
+            
+            donation2 = Donation(
+                campaign=campaign2,
+                donor=user1,
+                amount=150.00,
+                message="Keep up the good work!",
+                is_anonymous=True
+            )
+            
+            db.add_all([donation1, donation2])
+            await db.commit()
+            
+            # Create notifications
+            notification1 = Notification(
+                user=user1,
+                notification_type=NotificationType.NEW_LOAN,
+                message="Your loan application has been approved!",
+                read=False
+            )
+            
+            notification2 = Notification(
+                user=user2,
+                notification_type=NotificationType.NEW_DONATION,
+                message="Thank you for your donation to Education for All!",
+                read=False
+            )
+            
+            db.add_all([notification1, notification2])
+            await db.commit()
+            
+            # Update campaign amounts raised
+            campaign1.amount_raised = 3500.00
+            campaign2.amount_raised = 5200.00
+            await db.commit()
+            
+            print("✅ Sample data created successfully!")
+            
             
             db.add_all([admin_role, user_role, donor_role])
             await db.flush()
