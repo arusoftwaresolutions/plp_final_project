@@ -1,7 +1,7 @@
-# Aggregate SQLAlchemy models so `from app import models` exposes ORM classes
+# Aggregate SQLAlchemy models so `from backend.app import models` exposes ORM classes
 
-# Export the core models defined in app/db/models.py
-from app.db.models import (
+# Export the core models defined in backend/app/db/models.py
+from backend.app.db.models import (
     Base,
     User,
     Role,
@@ -16,7 +16,7 @@ from app.db.models import (
 )
 
 # Export notification-related models defined in this package
-from .notification import (
+from backend.app.models.notification import (
     Notification,
     NotificationType,
     UserNotificationPreference,
