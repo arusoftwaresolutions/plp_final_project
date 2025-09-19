@@ -23,6 +23,24 @@ def create_db_engine():
         else:
             logger.info(f"Connecting to database: {db_url}")
 
+        # Parse the URL to check for SSL parameters
+        from urllib.parse import urlparse, parse_qs
+        parsed = urlparse(db_url)
+        query_params = parse_qs(parsed.query)
+        
+        # Prepare connect_args based on URL parameters
+        connect_args = {}
+        
+        # Handle SSL if specified in the URL
+        if 'ssl' in query_params:
+            ssl_value = query_params['ssl'][0].lower()
+            if ssl_value == 'require':
+                import ssl
+                ssl_context = ssl.create_default_context()
+                ssl_context.check_hostname = False
+                ssl_context.verify_mode = ssl.CERT_NONE
+                connect_args['ssl'] = ssl_context
+        
         # Configure connection pool and timeouts
         engine = create_async_engine(
             db_url,
@@ -32,7 +50,7 @@ def create_db_engine():
             pool_size=5,         # Number of connections to keep open
             max_overflow=10,     # Max number of connections to create beyond pool_size
             pool_timeout=30,     # Max seconds to wait for a connection
-            connect_args={"connect_timeout": 10}  # Connection timeout in seconds
+            connect_args=connect_args
         )
         
         logger.info("Database engine created successfully")
