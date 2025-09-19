@@ -3,7 +3,7 @@ from enum import Enum as PyEnum
 from sqlalchemy import Column, Integer, String, Text, Boolean, DateTime, ForeignKey, JSON
 from sqlalchemy.orm import relationship
 
-from app.db.base_class import Base
+from backend.app.db.base_class import Base
 
 class NotificationType(str, PyEnum):
     """Types of notifications in the system."""
@@ -62,7 +62,7 @@ class UserNotificationPreference(Base):
         return f"<UserNotificationPreference {self.user_id} - {self.notification_type}>"
 
 # Import User model from db.models to avoid circular imports
-from app.db.models import User
+from backend.app.db.models import User
 
 # Add relationships to User model if not already present
 if not hasattr(User, 'notifications'):
