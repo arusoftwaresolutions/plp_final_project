@@ -69,6 +69,8 @@ services:
     
     # Environment variables
     envVars:
+      - key: PYTHON_VERSION
+        value: "3.12.0"
       - key: ENVIRONMENT
         value: production
         
