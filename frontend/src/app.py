@@ -201,68 +201,67 @@ init_session_state()
 # Navigation configuration
 PAGES: Dict[str, Dict[str, Any]] = {
     "Dashboard": {
-        "module": "dashboard",
+        "module": dashboard,
         "icon": "📊",
         "requires_auth": True,
         "category": "main",
         "order": 1
     },
     "AI Recommendations": {
-        "module": "ai_recommendations",
+        "module": ai_recommendations,
         "icon": "🤖",
         "requires_auth": True,
         "category": "tools",
         "order": 2
     },
     "Transactions": {
-        "module": "transactions",
+        "module": transactions,
         "icon": "💳",
         "requires_auth": True,
         "category": "finance",
         "order": 3
     },
     "Crowdfunding": {
-        "module": "crowdfunding",
+        "module": crowdfunding,
         "icon": "🤝",
         "requires_auth": True,
         "category": "community",
         "order": 4
     },
     "Microloans": {
-        "module": "microloans",
+        "module": microloans,
         "icon": "📈",
         "requires_auth": True,
         "category": "finance",
         "order": 5
     },
     "Poverty Map": {
-        "module": "poverty_map",
+        "module": poverty_map,
         "icon": "🗺️",
         "requires_auth": True,
         "category": "community",
         "order": 6
     },
     "Profile": {
-        "module": "profile",
+        "module": profile,
         "icon": "👤",
         "requires_auth": True,
         "category": "account",
         "order": 98
     },
-    "Admin Panel": {
-        "module": "admin_panel",
+    "Admin": {
+        "module": admin_panel,
         "icon": "🔒",
         "requires_auth": True,
         "requires_admin": True,
         "category": "admin",
-        "order": 99,
-        "hide_from_nav": False
+        "order": 99
     },
     "Login": {
-        "module": "auth",
+        "module": auth,
         "icon": "🔑",
         "requires_auth": False,
-        "hide_from_nav": True,
+        "category": "account",
         "order": 100
     }
 }
