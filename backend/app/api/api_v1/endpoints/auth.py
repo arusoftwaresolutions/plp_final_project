@@ -29,8 +29,8 @@ async def login_access_token(
     try:
         logger.info(f"Login attempt for username: {form_data.username}")
         
-        # Log database connection info
-        logger.info(f"Database URL: {settings.DATABASE}")
+        # Log database connection info (redacted for security)
+        logger.info("Database connection check...")
         
         # Check if database is accessible
         try:
@@ -42,7 +42,7 @@ async def login_access_token(
             logger.error(f"Database connection error: {str(db_error)}", exc_info=True)
             raise HTTPException(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail=f"Database connection error: {str(db_error)}"
+                detail="Database connection error. Please try again later."
             )
         
         # Authenticate user
@@ -50,7 +50,6 @@ async def login_access_token(
             user = await auth_service.authenticate(
                 db, email=form_data.username, password=form_data.password
             )
-            logger.info(f"User authentication result: {user is not None}")
             
             if not user:
                 logger.warning(f"Authentication failed for user: {form_data.username}")
@@ -63,7 +62,7 @@ async def login_access_token(
                 logger.warning(f"Inactive user attempted login: {form_data.username}")
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Inactive user"
+                    detail="Account is inactive. Please contact support."
                 )
                 
             # Create access token
@@ -71,9 +70,9 @@ async def login_access_token(
             
             # Get user roles
             role_names = [role.name for role in user.roles] if user.roles else []
-            logger.info(f"User roles: {role_names}")
+            logger.info(f"User {user.email} logged in with roles: {role_names}")
             
-            # Create token
+            # Create token data
             token_data = {
                 "access_token": security.create_access_token(
                     user.id,
@@ -88,20 +87,25 @@ async def login_access_token(
             
         except HTTPException as http_exc:
             # Re-raise HTTP exceptions
+            logger.warning(f"HTTP Exception: {str(http_exc.detail)}")
             raise http_exc
             
         except Exception as auth_error:
             logger.error(f"Authentication error: {str(auth_error)}", exc_info=True)
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"Authentication error: {str(auth_error)}"
+                detail="Authentication failed. Please try again."
             )
             
+    except HTTPException as http_exc:
+        # Re-raise HTTP exceptions from outer try block
+        raise http_exc
+        
     except Exception as e:
         logger.error(f"Unexpected error in login endpoint: {str(e)}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="An unexpected error occurred"
+            detail="An unexpected error occurred. Please try again later."
         )
 
 @router.post("/login/test-token", response_model=UserResponse)

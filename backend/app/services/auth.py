@@ -36,11 +36,18 @@ class AuthService:
         Returns:
             User object if authentication is successful, None otherwise
         """
-        from backend.app.services.user import user as user_service
+        from sqlalchemy.orm import selectinload
+        from sqlalchemy import select
         from backend.app.core.security import verify_password
         
-        # Get user by email
-        user = await user_service.get_by_email(db, email=email)
+        # Get user by email with roles eagerly loaded
+        result = await db.execute(
+            select(User)
+            .options(selectinload(User.roles))
+            .filter(User.email == email)
+        )
+        user = result.scalars().first()
+        
         if not user:
             return None
             

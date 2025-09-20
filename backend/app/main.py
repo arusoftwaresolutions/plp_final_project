@@ -10,7 +10,7 @@ from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from urllib.parse import urlparse
-from sqlalchemy import select, text
+from sqlalchemy import select, text, func
 from sqlalchemy.exc import SQLAlchemyError, OperationalError
 
 from backend.app.core.config import settings
@@ -219,35 +219,47 @@ async def init_db():
 
     pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
     
-    # Check if database is already initialized
+    # Check if database is already fully seeded
     async with AsyncSessionLocal() as db:
-        result = await db.execute(select(Role))
-        if result.scalars().first() is not None:
-            logger.info("Database already initialized, skipping sample data seeding")
+        # Check if we have all required data
+        roles_exist = (await db.execute(select(func.count()).select_from(Role))).scalar() >= 3
+        users_exist = (await db.execute(select(func.count()).select_from(User))).scalar() >= 2
+        
+        if roles_exist and users_exist:
+            logger.info("✅ Database already initialized with sample data")
             return
             
-    logger.info("🌱 Seeding database with sample data...")
-
+        logger.info("🌱 Database not fully initialized, proceeding with seeding...")
+            
     try:
         async with AsyncSessionLocal() as db:
-            # Create roles
-            admin_role = Role(name="admin", description="Administrator with full access")
-            user_role = Role(name="user", description="Regular user")
-            donor_role = Role(name="donor", description="Donor user")
-            db.add_all([admin_role, user_role, donor_role])
-            await db.commit()
-            await db.refresh(admin_role)
-            await db.refresh(user_role)
-            await db.refresh(donor_role)
+            # Create roles if they don't exist
+            roles = {
+                "admin": await db.execute(select(Role).filter(Role.name == "admin")),
+                "user": await db.execute(select(Role).filter(Role.name == "user")),
+                "donor": await db.execute(select(Role).filter(Role.name == "donor"))
+            }
             
-            logger.info("✅ Created roles: admin, user, donor")
-
-            # --- ROLES ---
-            admin_role = Role(name="admin", description="Administrator with full access")
-            user_role = Role(name="user", description="Regular user")
-            donor_role = Role(name="donor", description="Donor user")
-            db.add_all([admin_role, user_role, donor_role])
+            if not roles["admin"].scalars().first():
+                admin_role = Role(name="admin", description="Administrator with full access")
+                db.add(admin_role)
+                
+            if not roles["user"].scalars().first():
+                user_role = Role(name="user", description="Regular user")
+                db.add(user_role)
+                
+            if not roles["donor"].scalars().first():
+                donor_role = Role(name="donor", description="Donor user")
+                db.add(donor_role)
+            
             await db.commit()
+            
+            # Refresh role objects
+            admin_role = (await db.execute(select(Role).filter(Role.name == "admin"))).scalars().first()
+            user_role = (await db.execute(select(Role).filter(Role.name == "user"))).scalars().first()
+            donor_role = (await db.execute(select(Role).filter(Role.name == "donor"))).scalars().first()
+            
+            logger.info("✅ Verified/Created roles: admin, user, donor")
 
             # --- USERS ---
             admin_user = User(
@@ -487,49 +499,89 @@ async def check_database_connection() -> bool:
         return False
 
 async def ensure_admin_user() -> bool:
-    """Ensure the admin user exists in the database."""
+    """
+    Initialize the database with sample data.
+    """
+    from sqlalchemy import select, func
+    from sqlalchemy.orm import selectinload
     from backend.app.db.models import User, Role
     from backend.app.core.security import get_password_hash
     
-    try:
-        async with AsyncSessionLocal() as db:
-            # Check if admin role exists
-            result = await db.execute(select(Role).filter(Role.name == "admin"))
-            admin_role = result.scalars().first()
+    logger.info("Starting database initialization...")
+    
+    async with AsyncSessionLocal() as db:
+        try:
+            # Check if we have the required roles
+            required_roles = ["admin", "moderator", "user"]
+            roles = {}
             
-            if not admin_role:
-                logger.info("Creating admin role...")
-                admin_role = Role(name="admin", description="Administrator with full access")
-                db.add(admin_role)
-                await db.commit()
-                await db.refresh(admin_role)
+            # Create roles if they don't exist
+            for role_name in required_roles:
+                result = await db.execute(
+                    select(Role).where(Role.name == role_name)
+                )
+                role = result.scalars().first()
+                
+                if not role:
+                    description = {
+                        "admin": "Administrator with full access",
+                        "moderator": "Moderator with limited admin access",
+                        "user": "Regular user"
+                    }.get(role_name, role_name.capitalize())
+                    
+                    role = Role(name=role_name, description=description)
+                    db.add(role)
+                    logger.info(f"Created role: {role_name}")
+                
+                roles[role_name] = role
+            
+            await db.commit()
             
             # Check if admin user exists
-            result = await db.execute(select(User).filter(User.email == settings.FIRST_SUPERUSER_EMAIL))
-            admin_user = result.scalars().first()
+            admin_email = "admin@example.com"
+            result = await db.execute(
+                select(User)
+                .options(selectinload(User.roles))
+                .where(User.email == admin_email)
+            )
+            admin = result.scalars().first()
             
-            if not admin_user:
-                logger.info("Creating admin user...")
-                admin_user = User(
-                    username=settings.FIRST_SUPERUSER,
-                    email=settings.FIRST_SUPERUSER_EMAIL,
-                    hashed_password=get_password_hash(settings.FIRST_SUPERUSER_PASSWORD),
+            if not admin:
+                # Create admin user
+                admin = User(
+                    email=admin_email,
+                    username="admin",
+                    hashed_password=get_password_hash("admin123"),
                     full_name="Admin User",
-                    is_verified=True,
                     is_active=True,
-                    roles=[admin_role]
+                    is_verified=True
                 )
-                db.add(admin_user)
+                db.add(admin)
                 await db.commit()
-                logger.info("✅ Admin user created successfully")
-            else:
-                logger.info("✅ Admin user already exists")
-                
-            return True
+                await db.refresh(admin)
+                logger.info("Created admin user")
             
-    except Exception as e:
-        logger.error(f"❌ Failed to ensure admin user: {e}")
-        return False
+            # Ensure admin has the admin role
+            admin_roles = {role.name for role in admin.roles}
+            if "admin" not in admin_roles:
+                admin.roles.append(roles["admin"])
+                await db.commit()
+                logger.info("Assigned admin role to admin user")
+            
+            # Verify we have at least one admin user
+            if not admin.is_active:
+                admin.is_active = True
+                await db.commit()
+                logger.info("Activated admin user")
+            
+            logger.info("✅ Database initialization completed successfully")
+            
+        except Exception as e:
+            logger.error(f"❌ Database initialization failed: {str(e)}", exc_info=True)
+            await db.rollback()
+            return False
+            
+        return True
 
 @app.on_event("startup")
 async def on_startup():
