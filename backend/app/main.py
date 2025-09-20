@@ -289,16 +289,10 @@ async def init_db():
                 is_active=True,
                 roles=[user_role, donor_role]
             )
-            # Create sample transaction categories
-            categories = [
-                TransactionCategory(name="Food & Groceries", description="Food and grocery expenses"),
-                TransactionCategory(name="Transportation", description="Transportation costs"),
-                TransactionCategory(name="Housing", description="Rent and housing expenses"),
-                TransactionCategory(name="Healthcare", description="Medical and healthcare expenses"),
-                TransactionCategory(name="Education", description="Education-related expenses")
-            ]
-            db.add_all(categories)
-            await db.commit()
+            # No need to create TransactionCategory instances as they are enums
+            # The TransactionCategory enum is already defined in models.py
+            # We'll use the enum values directly when creating transactions
+            pass
             
             # Create sample loan statuses
             loan_statuses = [
@@ -335,7 +329,7 @@ async def init_db():
                     user=admin_user,
                     amount=1500.00,
                     transaction_type=TransactionType.INCOME,
-                    category=TransactionCategory.SALARY,
+                    category=TransactionCategory.SALARY.value,
                     description="Monthly salary",
                     date=today - timedelta(days=5)
                 ),
@@ -343,7 +337,7 @@ async def init_db():
                     user=user1,
                     amount=1200.00,
                     transaction_type=TransactionType.INCOME,
-                    category=TransactionCategory.SALARY,
+                    category=TransactionCategory.SALARY.value,
                     description="Monthly salary",
                     date=today - timedelta(days=10)
                 ),
@@ -351,7 +345,7 @@ async def init_db():
                     user=user1,
                     amount=150.00,
                     transaction_type=TransactionType.EXPENSE,
-                    category=TransactionCategory.FOOD,
+                    category=TransactionCategory.FOOD.value,
                     description="Weekly groceries",
                     date=today - timedelta(days=2)
                 ),
@@ -359,7 +353,7 @@ async def init_db():
                     user=user2,
                     amount=200.00,
                     transaction_type=TransactionType.SAVINGS,
-                    category=TransactionCategory.EMERGENCY_FUND,
+                    category=TransactionCategory.EMERGENCY_FUND.value,
                     description="Monthly savings",
                     date=today - timedelta(days=15)
                 )
