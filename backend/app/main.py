@@ -207,7 +207,7 @@ async def init_db():
     """Initialize the database with sample data."""
     from datetime import datetime, timedelta
     import json
-    from sqlalchemy import select
+    from sqlalchemy import select, func
     from backend.app.db.models import (
         Role, User, Transaction, TransactionType, TransactionCategory,
         MicroLoan, LoanStatus, LoanRepayment, CrowdFundingCampaign,
@@ -219,36 +219,36 @@ async def init_db():
 
     pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
     
-    # Check if database is already fully seeded
-    async with AsyncSessionLocal() as db:
-        # Check if we have all required data
-        roles_exist = (await db.execute(select(func.count()).select_from(Role))).scalar() >= 3
-        users_exist = (await db.execute(select(func.count()).select_from(User))).scalar() >= 2
-        
-        if roles_exist and users_exist:
-            logger.info("✅ Database already initialized with sample data")
-            return
-            
-        logger.info("🌱 Database not fully initialized, proceeding with seeding...")
-            
     try:
         async with AsyncSessionLocal() as db:
-            # Create roles if they don't exist
-            roles = {
-                "admin": await db.execute(select(Role).filter(Role.name == "admin")),
-                "user": await db.execute(select(Role).filter(Role.name == "user")),
-                "donor": await db.execute(select(Role).filter(Role.name == "donor"))
-            }
+            # Check if database is already fully seeded
+            roles_exist = (await db.execute(select(func.count()).select_from(Role))).scalar() >= 3
+            users_exist = (await db.execute(select(func.count()).select_from(User))).scalar() >= 2
             
-            if not roles["admin"].scalars().first():
-                admin_role = Role(name="admin", description="Administrator with full access")
-                db.add(admin_role)
+            if roles_exist and users_exist:
+                logger.info("✅ Database already initialized with sample data")
+                return
                 
-            if not roles["user"].scalars().first():
-                user_role = Role(name="user", description="Regular user")
-                db.add(user_role)
+            logger.info("🌱 Database not fully initialized, proceeding with seeding...")
+            
+            # Create roles if they don't exist
+            roles = {}
+            for role_name, desc in [
+                ("admin", "Administrator with full access"),
+                ("user", "Regular user"),
+                ("donor", "User who can donate to campaigns")
+            ]:
+                # Check if role exists
+                result = await db.execute(select(Role).filter(Role.name == role_name))
+                role = result.scalars().first()
                 
-            if not roles["donor"].scalars().first():
+                # Create role if it doesn't exist
+                if not role:
+                    role = Role(name=role_name, description=desc)
+                    db.add(role)
+                    await db.commit()
+                    await db.refresh(role)
+                roles[role_name] = role
                 donor_role = Role(name="donor", description="Donor user")
                 db.add(donor_role)
             
@@ -619,55 +619,48 @@ async def ensure_admin_user() -> bool:
 @app.on_event("startup")
 async def on_startup():
     """Initialize application services on startup."""
+    import asyncio
+    
+    async def initialize_database():
+        """Initialize database asynchronously."""
+        try:
+            # Log database URL (with redacted password)
+            db_url = settings.DATABASE
+            parsed = urlparse(db_url)
+            if parsed.password:
+                redacted_netloc = f"{parsed.username}:*****@{parsed.hostname}"
+                if parsed.port:
+                    redacted_netloc += f":{parsed.port}"
+                logger.info(f"🔍 Connecting to database: {parsed.scheme}://{redacted_netloc}{parsed.path}")
+            else:
+                logger.info(f"🔍 Connecting to database: {db_url}")
+            
+            # Create database tables if they don't exist
+            logger.info("🔄 Creating database tables...")
+            async with engine.begin() as conn:
+                await conn.run_sync(Base.metadata.create_all)
+            logger.info("✅ Database tables created")
+            
+            # Initialize database with sample data in the background
+            asyncio.create_task(init_db())
+            
+            # Verify admin user exists in the background
+            asyncio.create_task(ensure_admin_user())
+            
+            # Warm up database connection
+            logger.info("🔥 Warming up database connection...")
+            async with AsyncSessionLocal() as db:
+                await db.execute(text("SELECT 1"))
+            logger.info("✅ Database connection ready")
+            
+        except Exception as e:
+            logger.error(f"❌ Database initialization error: {e}")
+            raise
+    
     logger.info("🚀 Starting application...")
-    
-    # Log database URL (with redacted password)
-    db_url = settings.DATABASE
-    parsed = urlparse(db_url)
-    if parsed.password:
-        redacted_netloc = f"{parsed.username}:*****@{parsed.hostname}"
-        if parsed.port:
-            redacted_netloc += f":{parsed.port}"
-        logger.info(f"🔍 Connecting to database: {parsed.scheme}://{redacted_netloc}{parsed.path}")
-    else:
-        logger.info(f"🔍 Connecting to database: {db_url}")
-    
-    # Wait for database to be ready
-    logger.info("🔍 Checking database connection...")
-    if not await wait_for_db(db_url):
-        logger.error("❌ Failed to connect to database. Please check your database settings.")
-        return
-    
-    try:
-        # Create database tables
-        logger.info("🔄 Creating database tables...")
-        async with engine.begin() as conn:
-            await conn.run_sync(Base.metadata.create_all)
-        
-        # Initialize database with seed data
-        logger.info("🌱 Seeding database...")
-        try:
-            await init_db()
-            logger.info("✅ Database seeding completed successfully")
-        except Exception as seed_error:
-            logger.error(f"⚠️ Error during database seeding: {seed_error}")
-            logger.error(traceback.format_exc())
-        
-        # Ensure admin user exists
-        try:
-            await ensure_admin_user()
-            logger.info("✅ Admin user check completed")
-        except Exception as admin_error:
-            logger.error(f"⚠️ Error ensuring admin user: {admin_error}")
-            logger.error(traceback.format_exc())
-        
-        logger.info("✅ Database initialization complete")
-        
-    except Exception as e:
-        logger.error(f"❌ Failed to initialize database: {e}")
-        logger.error(traceback.format_exc())
-        raise
-
+    # Start database initialization in the background
+    asyncio.create_task(initialize_database())
+    logger.info("🚀 Application startup tasks initiated")
 
 # Run locally
 if __name__ == "__main__":

@@ -5,6 +5,119 @@ import logging
 import streamlit as st
 from dotenv import load_dotenv
 from typing import Dict, Any, Callable, Awaitable, Optional, List, Tuple
+from streamlit_option_menu import option_menu
+import base64
+from pathlib import Path
+
+# Set page config at the top
+st.set_page_config(
+    page_title="SDG Finance Platform",
+    page_icon="🌍",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
+
+# Custom CSS for modern styling
+def load_css():
+    custom_css = """
+    <style>
+        /* Main container */
+        .main {
+            background-color: #f8f9fa;
+        }
+        
+        /* Sidebar */
+        [data-testid="stSidebar"] {
+            background: linear-gradient(180deg, #2c3e50 0%, #1a2530 100%);
+            color: white;
+            padding: 1rem 0.5rem;
+        }
+        
+        /* Sidebar header */
+        [data-testid="stSidebarNav"]::before {
+            content: "SDG Finance";
+            display: block;
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #fff;
+            padding: 1rem 1rem 2rem 1rem;
+            text-align: center;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            margin-bottom: 1rem;
+        }
+        
+        /* Menu items */
+        .st-bb {
+            background-color: transparent !important;
+        }
+        
+        .st-bb:hover {
+            background-color: rgba(255, 255, 255, 0.1) !important;
+        }
+        
+        /* Cards */
+        .card {
+            background: white;
+            border-radius: 10px;
+            padding: 1.5rem;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+            margin-bottom: 1.5rem;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        
+        .card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.1);
+        }
+        
+        /* Buttons */
+        .stButton>button {
+            border-radius: 20px;
+            border: none;
+            background: linear-gradient(90deg, #4b6cb7 0%, #182848 100%);
+            color: white;
+            font-weight: 500;
+            padding: 0.5rem 1.5rem;
+            transition: all 0.3s ease;
+        }
+        
+        .stButton>button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        }
+        
+        /* Input fields */
+        .stTextInput>div>div>input {
+            border-radius: 8px;
+            border: 1px solid #e0e0e0;
+            padding: 0.5rem 1rem;
+        }
+        
+        /* Tables */
+        .stDataFrame {
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+        }
+        
+        /* Tabs */
+        .stTabs [data-baseweb="tab-list"] {
+            gap: 0.5rem;
+        }
+        
+        .stTabs [data-baseweb="tab"] {
+            border-radius: 8px 8px 0 0 !important;
+            padding: 0.5rem 1.5rem;
+            transition: all 0.3s ease;
+        }
+        
+        .stTabs [aria-selected="true"] {
+            background-color: #4b6cb7;
+            color: white !important;
+        }
+    </style>
+    """
+    st.markdown(custom_css, unsafe_allow_html=True)
 
 # Configure logging
 logging.basicConfig(
@@ -16,8 +129,29 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# Load environment variables
+load_dotenv()
+
+# Set auth token from environment variable if available
+if 'AUTH_TOKEN' not in st.session_state and os.getenv('AUTH_TOKEN'):
+    st.session_state.auth_token = os.getenv('AUTH_TOKEN')
+    st.session_state.is_authenticated = True
+    logger.info("Authenticated with token from environment")
+
 # Add the src directory to the path for module imports
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+# Navigation configuration
+MENU_ITEMS = [
+    {"label": "Dashboard", "icon": "speedometer2", "module": "dashboard", "roles": ["user", "admin"]},
+    {"label": "AI Recommendations", "icon": "robot", "module": "ai_recommendations", "roles": ["user", "admin"]},
+    {"label": "Transactions", "icon": "cash-stack", "module": "transactions", "roles": ["user", "admin"]},
+    {"label": "Crowdfunding", "icon": "people-fill", "module": "crowdfunding", "roles": ["user", "admin"]},
+    {"label": "Micro Loans", "icon": "piggy-bank", "module": "microloans", "roles": ["user", "admin"]},
+    {"label": "Poverty Map", "icon": "geo-alt", "module": "poverty_map", "roles": ["user", "admin"]},
+    {"label": "My Profile", "icon": "person-circle", "module": "profile", "roles": ["user", "admin"]},
+    {"label": "Admin Panel", "icon": "shield-lock", "module": "admin_panel", "roles": ["admin"]},
+]
 
 # Import page modules from the pages package with error handling
 PAGE_MODULES = {}
@@ -198,7 +332,9 @@ def init_session_state():
 # Initialize the session state
 init_session_state()
 
-# Navigation configuration
+# Set default page if not set
+if 'page' not in st.session_state:
+    st.session_state.page = 'dashboard'
 PAGES: Dict[str, Dict[str, Any]] = {
     "Dashboard": {
         "module": dashboard,
@@ -346,47 +482,59 @@ async def render_page(page_name: str) -> None:
         st.exception(e)  # Log full exception for debugging
 
 async def main():
-    """Main application function."""
-    # Get current page from query params or session state
-    current_page = st.query_params.get("page", st.session_state.current_page)
-    
-    # Update session state
-    st.session_state.current_page = current_page
-    
-    # Render navigation (except for login page)
-    if current_page != "Login" or not st.session_state.authenticated:
-        render_navbar()
     
     # Render the current page
-    await render_page(current_page)
+    page = st.session_state.get('page', 'dashboard')
+    if page in PAGE_MODULES:
+        try:
+            PAGE_MODULES[page].show()
+        except Exception as e:
+            st.error(f"Error loading page: {str(e)}")
+            logger.error(f"Error in page {page}: {str(e)}")
+    else:
+        st.warning("Page not found. Redirecting to dashboard...")
+        st.session_state.page = 'dashboard'
+        st.rerun()
+
+def main():
+    """Main application function."""
+    # Load CSS
+    load_css()
     
-    # Add custom CSS
+    # Check authentication
+    if not st.session_state.get('is_authenticated', False):
+        PAGE_MODULES['auth'].show()
+        return
+    
+    # Create main layout
+    col1, col2 = st.columns([1, 4])
+    
+    # Render the sidebar in the first column
+    with col1:
+        render_sidebar()
+    
+    # Render the main content in the second column
+    with col2:
+        render_main_content()
+    
+    # Add footer
     st.markdown("""
-        <style>
-            /* Main content padding */
-            .main .block-container {
-                padding-top: 2rem;
-                padding-bottom: 2rem;
-            }
-            
-            /* Button styling */
-            .stButton > button {
-                border-radius: 0.5rem;
-                padding: 0.5rem 1rem;
-                font-weight: 500;
-                transition: all 0.2s ease;
-            }
-            
-            /* Card styling */
-            .card {
-                background: white;
-                border-radius: 0.5rem;
-                box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
-                padding: 1.5rem;
-                margin-bottom: 1.5rem;
-            }
-            
-            /* Form styling */
+    <style>
+        .footer {
+            padding: 1rem 0;
+            margin-top: 2rem;
+            text-align: center;
+            color: #666;
+            font-size: 0.8rem;
+            border-top: 1px solid #e0e0e0;
+        }
+    </style>
+    <div class="footer">
+        2023 SDG Finance Platform | Version 1.0.0 | 
+        <a href="#" style="color: #4b6cb7; text-decoration: none;">Help</a> | 
+        <a href="#" style="color: #4b6cb7; text-decoration: none;">Terms</a> | 
+        <a href="#" style="color: #4b6cb7; text-decoration: none;">Privacy</a>
+    </div>
             .stTextInput > div > div > input,
             .stTextArea > div > div > textarea,
             .stSelectbox > div > div > div,

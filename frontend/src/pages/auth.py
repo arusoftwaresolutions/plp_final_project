@@ -90,9 +90,6 @@ async def login_user(email: str, password: str):
                 "grant_type": "password"
             }
             
-            st.write("Sending login request...")  # Debugging
-            st.write("Form data:", form_data)  # Debugging
-            
             # Make the login request with form data
             try:
                 # Make the request directly with requests to have more control
@@ -106,9 +103,6 @@ async def login_user(email: str, password: str):
                     "accept": "application/json"
                 }
                 
-                st.write(f"Sending POST to: {url}")  # Debugging
-                st.write(f"Headers: {headers}")  # Debugging
-                
                 # Make the request
                 response = requests.post(
                     url,
@@ -117,18 +111,11 @@ async def login_user(email: str, password: str):
                     timeout=30
                 )
                 
-                st.write(f"Response status: {response.status_code}")  # Debugging
-                st.write(f"Response headers: {response.headers}")  # Debugging
-                
                 # Parse the response
                 try:
                     token_response = response.json()
-                    st.write("Response JSON:", token_response)  # Debugging
                 except ValueError:
-                    st.write(f"Non-JSON response: {response.text}")  # Debugging
                     token_response = None
-                
-                st.write("Login response:", token_response)  # Debugging line
                 
                 if not token_response or 'access_token' not in token_response:
                     st.error("❌ Invalid email or password")
@@ -162,7 +149,7 @@ async def login_user(email: str, password: str):
                 st.session_state.is_admin = user_response.get("is_superuser", False)
             
             st.success("✅ Successfully logged in!")
-            st.experimental_rerun()
+            st.rerun()
                 
     except Exception as e:
         st.error(f"🔌 Error: {str(e)}")
