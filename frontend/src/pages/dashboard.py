@@ -684,6 +684,19 @@ def run():
     import asyncio
     asyncio.run(show())
 
+# This is the main entry point when running the script directly
 if __name__ == "__main__":
-    # This is the entry point when running the script directly
-    main()
+    # Check if we're running in Streamlit
+    try:
+        import streamlit as st
+        if hasattr(st, '_is_running_with_streamlit'):
+            # If yes, just run the main function
+            main()
+        else:
+            # If not, print instructions
+            print("This is a Streamlit component and should be run as part of the main application.")
+            print("Please run the main application using:")
+            print("\n    streamlit run app.py\n")
+    except ImportError:
+        # If streamlit is not available, just run the main function
+        main()

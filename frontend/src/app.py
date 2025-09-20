@@ -573,22 +573,18 @@ def run():
     asyncio.run(main())
 
 if __name__ == "__main__":
-    # For development, run the app directly
-    import streamlit.web.bootstrap
-    from streamlit.web.cli import _main_run
+    # This is the simplest and most reliable way to run the app
+    # Just import streamlit and run the app
+    import streamlit as st
     
-    # Set the Streamlit config
-    import sys
-    sys.argv = [
-        "streamlit", "run", 
-        str(Path(__file__).resolve()),
-        "--server.headless", "true",
-        "--server.port=8501",
-        "--server.address=0.0.0.0"
-    ]
-    
-    # Run the app
-    sys.exit(_main_run())
-    
-    # For production, you would typically just do:
-    # asyncio.run(main())
+    # Check if we're already running in Streamlit
+    if hasattr(st, '_is_running_with_streamlit'):
+        # If yes, just run the main function
+        import asyncio
+        asyncio.run(main())
+    else:
+        # If not, print instructions
+        print("Please run this application using Streamlit with the following command:")
+        print("\n    streamlit run app.py\n")
+        print("Or with custom options:")
+        print("\n    streamlit run app.py --server.port=8501 --server.address=0.0.0.0\n")
