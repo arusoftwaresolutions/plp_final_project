@@ -51,69 +51,64 @@ def login_user(email: str, password: str):
     """Authenticate user with the backend."""
     try:
         with st.spinner("Signing in..."):
-            # FastAPI endpoint expects OAuth2PasswordRequestForm-style form data
+            # Prepare the request data
+            login_data = {
+                "username": email,
+                "password": password,
+                "grant_type": "password",
+                "scope": "",
+                "client_id": "",
+                "client_secret": ""
+            }
+            
+            # Make the request to the backend
             response = requests.post(
                 f"{API_BASE_URL}/auth/login/access-token",
-                data={
-                    "username": email,
-                    "password": password,
-                },
+                data=login_data,
                 headers={"Content-Type": "application/x-www-form-urlencoded"},
-                timeout=10  # Add timeout to prevent hanging
+                timeout=10
             )
             
             if response.status_code == 200:
                 data = response.json()
-                # Store the token and user data in session state
-                st.session_state.state.token = data.get("access_token")
-                st.session_state.state.user = data.get("user", {})
+                access_token = data.get("access_token")
+                token_type = data.get("token_type", "bearer")
+                
+                if not access_token:
+                    st.error("❌ No access token received from server")
+                    return False
+                
+                # Store the token
+                st.session_state.state.token = access_token
                 st.session_state.state.is_authenticated = True
-                st.session_state.state.is_admin = data.get("user", {}).get("is_admin", False)
+                
+                # Get user info
+                user_response = requests.get(
+                    f"{API_BASE_URL}/users/me",
+                    headers={"Authorization": f"{token_type} {access_token}"},
+                    timeout=10
+                )
+                
+                if user_response.status_code == 200:
+                    user_data = user_response.json()
+                    st.session_state.state.user = user_data
+                    st.session_state.state.is_admin = user_data.get("is_superuser", False)
+                
                 st.success("✅ Login successful!")
                 st.experimental_rerun()
+                return True
+                
             else:
                 try:
                     error_data = response.json()
                     error_msg = error_data.get("detail", "Login failed. Please check your credentials.")
+                    if "detail" in error_data and isinstance(error_data["detail"], str):
+                        error_msg = error_data["detail"]
+                    elif "detail" in error_data and isinstance(error_data["detail"], dict):
+                        error_msg = ", ".join([f"{k}: {v[0]}" for k, v in error_data["detail"].items()])
                 except ValueError:
                     error_msg = f"Login failed with status code: {response.status_code}"
-                st.error(f"❌ {error_msg}")
-    except requests.exceptions.Timeout:
-        st.error("⏱️ Connection timeout. Please try again later.")
-    except requests.exceptions.RequestException as e:
-        st.error(f"🔌 Connection error: {str(e)}")
-        st.info("ℹ️ Please check if the backend server is running and accessible.")
-
-def register_user(email: str, username: str, password: str):
-    """Register a new user with the backend."""
-    try:
-        with st.spinner("Creating your account..."):
-            response = requests.post(
-                f"{API_BASE_URL}/auth/register",
-                json={
-                    "email": email,
-                    "username": username,
-                    "password": password,
-                    "is_active": True,
-                    "is_superuser": False,
-                    "is_verified": False
-                },
-                timeout=10
-            )
-            
-            if response.status_code == 200 or response.status_code == 201:
-                st.success("✅ Registration successful! Please log in.")
-                return True
-            else:
-                try:
-                    error_data = response.json()
-                    error_msg = error_data.get("detail", "Registration failed. Please try again.")
-                    if "email" in error_data.get("detail", {}):
-                        error_msg = f"Email error: {error_data['detail']['email'][0]}"
-                    elif "username" in error_data.get("detail", {}):
-                        error_msg = f"Username error: {error_data['detail']['username'][0]}"
-                except ValueError:
-                    error_msg = f"Registration failed with status code: {response.status_code}"
+                
                 st.error(f"❌ {error_msg}")
                 return False
                 
@@ -122,7 +117,69 @@ def register_user(email: str, username: str, password: str):
         return False
     except requests.exceptions.RequestException as e:
         st.error(f"🔌 Connection error: {str(e)}")
-        st.info("ℹ️ Please check if the backend server is running and accessible.")
+        st.info(f"ℹ️ Please check if the backend server is running at {API_BASE_URL}")
+        return False
+
+def register_user(email: str, username: str, password: str):
+    """Register a new user with the backend."""
+    try:
+        with st.spinner("Creating your account..."):
+            # Prepare registration data according to backend expectations
+            registration_data = {
+                "email": email,
+                "username": username,
+                "password": password,
+                "full_name": username,  # Using username as full_name if not provided
+                "is_active": True,
+                "is_superuser": False,
+                "is_verified": False
+            }
+            
+            # Make the registration request
+            response = requests.post(
+                f"{API_BASE_URL}/auth/register",
+                json=registration_data,
+                headers={"Content-Type": "application/json"},
+                timeout=10
+            )
+            
+            # Handle successful registration
+            if response.status_code in (200, 201):
+                st.success("✅ Registration successful! Please log in.")
+                return True
+            
+            # Handle registration errors
+            try:
+                error_data = response.json()
+                error_msg = "Registration failed. Please check your information and try again."
+                
+                # Handle different error response formats
+                if "detail" in error_data:
+                    if isinstance(error_data["detail"], str):
+                        error_msg = error_data["detail"]
+                    elif isinstance(error_data["detail"], dict):
+                        errors = []
+                        for field, messages in error_data["detail"].items():
+                            if isinstance(messages, list):
+                                errors.append(f"{field}: {', '.join(messages)}")
+                            else:
+                                errors.append(f"{field}: {messages}")
+                        error_msg = "; ".join(errors)
+                
+                st.error(f"❌ {error_msg}")
+                
+            except ValueError:
+                st.error(f"❌ Registration failed with status code: {response.status_code}")
+                
+            return False
+            
+    except requests.exceptions.Timeout:
+        st.error("⏱️ Connection timeout. Please try again later.")
+        return False
+        
+    except requests.exceptions.RequestException as e:
+        st.error(f"🔌 Connection error: {str(e)}")
+        st.info(f"ℹ️ Please check if the backend server is running at {API_BASE_URL}")
         return False
 
 def get_auth_headers():

@@ -13,7 +13,7 @@ class Settings(BaseSettings):
     ENVIRONMENT: str = os.getenv("ENVIRONMENT", "development")
     
     # API settings
-    API_BASE_URL: str = os.getenv("API_BASE_URL", "http://localhost:8000/api/v1")
+    API_BASE_URL: str = os.getenv("BACKEND_URL", "https://plp-final-project-bgex.onrender.com/api/v1")
     API_PREFIX: str = "/api/v1"
     
     # Authentication

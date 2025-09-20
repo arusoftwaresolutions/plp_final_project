@@ -16,57 +16,33 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Add custom CSS
+# Custom CSS for the app
 st.markdown("""
-    <style>
-    .main {
-        padding: 2rem;
-    }
-    .stButton>button {
-        width: 100%;
-    }
-    .stTextInput>div>div>input {
-        padding: 10px;
-    }
-    /* Custom scrollbar */
-    ::-webkit-scrollbar {
-        width: 8px;
-        height: 8px;
-    }
-    ::-webkit-scrollbar-track {
-        background: #f1f1f1;
-    }
-    ::-webkit-scrollbar-thumb {
-        background: #888;
-        border-radius: 4px;
-    }
-    ::-webkit-scrollbar-thumb:hover {
-        background: #555;
-    }
-    /* Card styling */
-    .card {
-        background: white;
-        border-radius: 10px;
-        padding: 1.5rem;
-        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-        margin-bottom: 1.5rem;
-    }
-    /* Custom tooltip */
-    .tooltip {
-        position: relative;
-        display: inline-block;
-        border-bottom: 1px dotted black;
-    }
-    .tooltip .tooltiptext {
-        visibility: hidden;
-        width: 200px;
-        background-color: #555;
-        color: #fff;
-        text-align: center;
-        border-radius: 6px;
-        padding: 5px;
-        position: absolute;
-        z-index: 1;
+<style>
+.main .block-container {
+    padding-top: 2rem;
+    padding-bottom: 2rem;
+}
+.stButton>button {
+    width: 100%;
+}
+.stTextInput>div>div>input {
+    border-radius: 20px;
+}
+/* Hide the default Streamlit menu */
+#MainMenu {visibility: hidden;}
+header {visibility: hidden;}
+footer {visibility: hidden;}
+/* Style for auth forms */
+.auth-form {
+    max-width: 400px;
+    margin: 0 auto;
+    padding: 2rem;
+    border-radius: 10px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    background-color: white;
+}
+</style>
         bottom: 125%;
         left: 50%;
         margin-left: -100px;
@@ -118,8 +94,11 @@ for var in ['show_create_campaign', 'show_organizations', 'show_learn_more', 'el
     if var not in st.session_state:
         st.session_state[var] = None
 
+# Check authentication state
+is_authenticated = hasattr(st.session_state.state, 'is_authenticated') and st.session_state.state.is_authenticated
+
 # Show sidebar only if user is authenticated
-if hasattr(st.session_state.state, 'is_authenticated') and st.session_state.state.is_authenticated:
+if is_authenticated:
     # Navigation menu
     with st.sidebar:
         st.image("assets/logo.png", width=200)
@@ -176,81 +155,16 @@ if hasattr(st.session_state.state, 'is_authenticated') and st.session_state.stat
         if st.button("🎯 Create Campaign", use_container_width=True):
             st.session_state.show_create_campaign = True
         
-        # Add footer
+        # Logout button at the bottom
         st.markdown("---")
-        st.caption(f"v1.0.0 • {datetime.now().year} © Poverty Alleviation Platform")
-
-def main():
-    # Check authentication
-    if not st.session_state.state.is_authenticated:
-        auth.show_login_page()
-        return
-
-    # Sidebar navigation
-    with st.sidebar:
-        st.image("assets/logo.png", width=200)
-        st.title("Poverty Alleviation")
+        if st.button(" Logout", use_container_width=True, type="primary"):
+            st.session_state.state = State()
+            st.experimental_rerun()
         
-        if st.session_state.state.is_authenticated:
-            # Show user info
-            st.markdown(f"### Welcome, {st.session_state.state.user.get('username', 'User')}")
-            
-            # Navigation menu
-            menu_options = [
-                "Dashboard",
-                "Transactions",
-                "Loans",
-                "Crowdfunding",
-                "Insights",
-                "Settings"
-            ]
-            
-            # Add admin menu if user is admin
-            if st.session_state.state.get('is_admin', False):
-                menu_options.append("Admin")
-            
-            selected = option_menu(
-                menu_title=None,
-                options=menu_options,
-                icons=[
-                    "house", "cash-coin", "bank", "people", "graph-up", "gear", "shield-lock"
-                ][:len(menu_options)],
-                default_index=0,
-                styles={
-                    "container": {"padding": "0!important", "background-color": "#f8f9fa"},
-                    "nav-link": {"font-size": "14px", "text-align": "left", "margin": "5px 0", "border-radius": "5px"},
-                    "nav-link-selected": {"background-color": "#0d6efd"},
-                }
-            )
-            
-            # Logout button
-            if st.button("Logout", use_container_width=True, type="primary"):
-                st.session_state.state = State()
-                st.experimental_rerun()
-                
-            # Add some space at the bottom
-            st.markdown("---")
-            st.markdown("### Quick Actions")
-            
-            # Quick action buttons
-            if st.button("💳 New Transaction", use_container_width=True):
-                st.session_state.show_new_transaction = True
-                
-            if st.button("📝 Apply for Loan", use_container_width=True):
-                st.session_state.show_loan_application = True
-                
-            if st.button("🎯 Create Campaign", use_container_width=True):
-                st.session_state.show_create_campaign = True
-            
-            # Add footer
-            st.markdown("---")
-            st.caption(f"v1.0.0 • {datetime.now().year} © Poverty Alleviation Platform")
-            
-        else:
-            st.write("Please log in to access the platform.")
-            selected = "Login"
+        # Version info
+        st.caption(f"v1.0.0 • {datetime.now().year} Poverty Alleviation Platform")
     
-    # Display selected page
+    # Main content area
     if selected == "Dashboard":
         dashboard.show()
     elif selected == "Transactions":
@@ -263,7 +177,7 @@ def main():
         insights.show()
     elif selected == "Settings":
         settings.show()
-    elif selected == "Admin" and st.session_state.state.is_admin:
+    elif selected == "Admin" and hasattr(st.session_state.state, 'is_admin') and st.session_state.state.is_admin:
         admin.show()
 
 if __name__ == "__main__":
