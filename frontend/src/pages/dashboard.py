@@ -90,7 +90,7 @@ def load_css():
     </style>
     """, unsafe_allow_html=True)
 
-def fetch_dashboard_data() -> Dict[str, Any]:
+async def fetch_dashboard_data() -> Dict[str, Any]:
     """Fetch dashboard data from the backend with error handling.
     
     Returns:
@@ -116,7 +116,7 @@ def fetch_dashboard_data() -> Dict[str, Any]:
     
     try:
         # Fetch dashboard data with error handling
-        data = api_request("GET", "/dashboard/")
+        data = await api_request("GET", "/dashboard/")
         if not data:
             st.warning("No data returned from the server. Using default values.")
             return default_data
@@ -147,7 +147,10 @@ def fetch_dashboard_data() -> Dict[str, Any]:
         return default_data
 
 async def show():
-    """Show the dashboard page with financial overview and metrics."""
+    """Show the dashboard page with financial overview and metrics.
+    
+    This is the main async function that renders the dashboard.
+    """
     # Load custom CSS
     load_css()
     
@@ -161,12 +164,22 @@ async def show():
         st.rerun()
         return
     
-    # Show loading state
+    # Show loading state and fetch data
     with st.spinner("Loading your financial dashboard..."):
-        dashboard_data = await fetch_dashboard_data()
-    
-    # Extract metrics with safe defaults
-    metrics = dashboard_data.get("metrics", {})
+        try:
+            # Load dashboard data
+            dashboard_data = await fetch_dashboard_data()
+            
+            # Check if we got valid data
+            if not dashboard_data or not isinstance(dashboard_data, dict):
+                st.error("Failed to load dashboard data: Invalid data format")
+                return
+                
+            # Extract metrics with safe defaults
+            metrics = dashboard_data.get("metrics", {})
+        except Exception as e:
+            st.error(f"Failed to load dashboard data: {str(e)}")
+            return
     
     # Create columns for metrics
     st.markdown("### Key Metrics")
@@ -647,11 +660,27 @@ async def show():
     st.write("")
     st.write("")
 
-async def main():
+def main():
     """Main entry point for the dashboard."""
-    # Run the dashboard
-    await show()
+    import asyncio
+    
+    # Check if we're running in a Streamlit context
+    try:
+        import streamlit as st
+        # In Streamlit, we'll use st.rerun() to handle async execution
+        if not hasattr(st, '_is_running_with_streamlit'):
+            raise ImportError("Not running with Streamlit")
+    except:
+        # If not in Streamlit, run with asyncio
+        asyncio.run(show())
+        return
+    
+    # If we get here, we're in Streamlit context
+    # We'll use st.experimental_rerun() to handle async updates
+    if 'dashboard_initialized' not in st.session_state:
+        st.session_state.dashboard_initialized = True
+        asyncio.run(show())
 
 if __name__ == "__main__":
-    import asyncio
-    asyncio.run(main())
+    # This is the entry point when running the script directly
+    main()

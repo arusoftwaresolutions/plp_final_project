@@ -42,3 +42,4 @@ streamlit-authenticator>=0.2.1
 # Async
 httpx>=0.24.1
 asyncio>=3.4.3
+aiohttp>=3.9.0

@@ -2,10 +2,10 @@
 
 import os
 import json
+import aiohttp
 from datetime import datetime
-from typing import Any, Dict, Optional, Union, List
+from typing import Any, Dict, Optional, Union, List, Tuple
 
-import requests
 import streamlit as st
 from dotenv import load_dotenv
 
@@ -34,7 +34,8 @@ async def api_request(
     data: Optional[Dict[str, Any]] = None, 
     params: Optional[Dict[str, Any]] = None,
     form_data: bool = False,
-    retry_on_auth_failure: bool = True
+    retry_on_auth_failure: bool = True,
+    timeout: int = 30
 ) -> Optional[Union[Dict[str, Any], List[Any]]]:
     """Make an API request with proper error handling and token refresh.
     
@@ -45,6 +46,7 @@ async def api_request(
         params: Query parameters
         form_data: Whether to send as form data
         retry_on_auth_failure: Whether to retry on 401 with token refresh
+        timeout: Request timeout in seconds
         
     Returns:
         Response data as dict/list or None if request failed
@@ -58,96 +60,19 @@ async def api_request(
     
     headers = get_auth_headers()
     
-    try:
-        # Prepare request kwargs
-        kwargs = {
-            "headers": headers,
-            "params": params or {},
-            "timeout": 30,  # 30 seconds timeout
-            "verify": True  # Enable SSL verification
-        }
-        
-        # Handle request data
-        if data is not None:
-            if form_data:
-                # For form data, ensure we're sending as x-www-form-urlencoded
-                headers["Content-Type"] = "application/x-www-form-urlencoded"
-                # Convert dict to form-urlencoded format
-                from urllib.parse import urlencode
-                kwargs["data"] = urlencode(data)
-            else:
-                # For JSON data
-                kwargs["json"] = data
-        
-        method = method.upper()
-        st.write(f"Making {method} request to: {url}")  # Debugging
-        st.write(f"Headers: {headers}")  # Debugging
-        st.write(f"Data: {data}")  # Debugging
-        
-        if method == "GET":
-            response = requests.get(url, **kwargs)
-        elif method == "POST":
-            response = requests.post(url, **kwargs)
-        elif method == "PUT":
-            response = requests.put(url, **kwargs)
-        elif method == "DELETE":
-            response = requests.delete(url, **kwargs)
-        else:
-            raise ValueError(f"Unsupported HTTP method: {method}")
-        
-        st.write(f"Response status: {response.status_code}")  # Debugging
-        st.write(f"Response headers: {response.headers}")  # Debugging
-        
-        # Try to parse JSON response
+    async with aiohttp.ClientSession() as session:
         try:
-            response_data = response.json()
-            st.write(f"Response data: {response_data}")  # Debugging
-        except ValueError:
-            response_data = response.text
-            st.write(f"Non-JSON response: {response_data}")  # Debugging
-        
-        # Handle 401 Unauthorized with token refresh
-        if response.status_code == 401 and retry_on_auth_failure and 'current_user' in st.session_state:
-            st.write("Received 401, attempting token refresh...")  # Debugging
-            # Try to refresh the token
-            refresh_token = st.session_state.current_user.get('refresh_token')
-            if refresh_token:
-                refresh_response = await refresh_access_token(refresh_token)
-                if refresh_response:
-                    # Update the session with new tokens
-                    st.session_state.current_user.update({
-                        'access_token': refresh_response['access_token'],
-                        'token_type': refresh_response.get('token_type', 'bearer')
-                    })
-                    # Retry the original request with new token
-                    return await api_request(
-                        method, endpoint, data, params, form_data, retry_on_auth_failure=False
-                    )
-        
-        response.raise_for_status()
-        
-        # Return None for 204 No Content
-        if response.status_code == 204:
-            return None
+            # Prepare request data
+            json_data = None
+            form_data_obj = None
             
-        # Handle empty responses
-        if not response.text.strip():
-            return None
-            
-        return response.json()
-        
-    except requests.exceptions.RequestException as e:
-        error_msg = str(e)
-        try:
-            if hasattr(e, 'response') and e.response is not None:
-                error_detail = e.response.json().get("detail", {})
-                if isinstance(error_detail, dict):
-                    error_msg = ", ".join([f"{k}: {v}" for k, v in error_detail.items()]) or str(e)
+            if data is not None:
+                if form_data:
+                    form_data_obj = aiohttp.FormData()
+                    for key, value in data.items():
+                        form_data_obj.add_field(key, str(value))
                 else:
-                    error_msg = str(error_detail) or str(e)
-                
-                # Handle 401 Unauthorized
-                if e.response.status_code == 401:
+                    json_data = data
                     st.error("Your session has expired. Please log in again.")
                     st.session_state.authenticated = False
                     st.session_state.current_user = None
@@ -174,13 +99,18 @@ async def refresh_access_token(refresh_token: str) -> Optional[Dict[str, Any]]:
             "grant_type": "refresh_token"
         }
         
-        response = requests.post(
-            f"{FULL_API_URL}/auth/refresh-token",
-            data=token_data,
-            timeout=30
-        )
-        response.raise_for_status()
-        return response.json()
+        async with aiohttp.ClientSession() as session:
+            async with session.post(
+                f"{FULL_API_URL}/auth/refresh-token",
+                data=token_data,
+                timeout=aiohttp.ClientTimeout(total=30)
+            ) as response:
+                if response.status == 200:
+                    return await response.json()
+                else:
+                    error_text = await response.text()
+                    st.error(f"Failed to refresh token: {response.status} - {error_text}")
+                    return None
     except Exception as e:
         st.error(f"Failed to refresh token: {str(e)}")
         return None
@@ -239,12 +169,13 @@ def format_date(date_str: str, format_str: str = "%b %d, %Y") -> str:
     except Exception as e:
         return str(date_str)
 
-def handle_api_error(response: requests.Response) -> str:
+async def handle_api_error(response: aiohttp.ClientResponse) -> str:
     """Extract error message from API response."""
     try:
-        error_data = response.json()
+        error_data = await response.json()
         if isinstance(error_data, dict):
             return error_data.get("detail", str(error_data))
         return str(error_data)
     except:
-        return f"Error {response.status_code}: {response.text}"
+        error_text = await response.text()
+        return f"Error {response.status}: {error_text}"
