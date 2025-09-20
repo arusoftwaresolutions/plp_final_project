@@ -667,19 +667,22 @@ def main():
     # Check if we're running in a Streamlit context
     try:
         import streamlit as st
-        # In Streamlit, we'll use st.rerun() to handle async execution
         if not hasattr(st, '_is_running_with_streamlit'):
             raise ImportError("Not running with Streamlit")
+        
+        # If we're in Streamlit, run the async function
+        if 'dashboard_initialized' not in st.session_state:
+            st.session_state.dashboard_initialized = True
+            asyncio.run(show())
     except:
-        # If not in Streamlit, run with asyncio
+        # If not in Streamlit, just run the async function directly
         asyncio.run(show())
-        return
-    
-    # If we get here, we're in Streamlit context
-    # We'll use st.experimental_rerun() to handle async updates
-    if 'dashboard_initialized' not in st.session_state:
-        st.session_state.dashboard_initialized = True
-        asyncio.run(show())
+
+# This allows the dashboard to be imported and used as a module
+def run():
+    """Run the dashboard."""
+    import asyncio
+    asyncio.run(show())
 
 if __name__ == "__main__":
     # This is the entry point when running the script directly

@@ -482,29 +482,24 @@ async def render_page(page_name: str) -> None:
         st.exception(e)  # Log full exception for debugging
 
 async def main():
-    
-    # Render the current page
-    page = st.session_state.get('page', 'dashboard')
-    if page in PAGE_MODULES:
-        try:
-            PAGE_MODULES[page].show()
-        except Exception as e:
-            st.error(f"Error loading page: {str(e)}")
-            logger.error(f"Error in page {page}: {str(e)}")
-    else:
-        st.warning("Page not found. Redirecting to dashboard...")
-        st.session_state.page = 'dashboard'
-        st.rerun()
-
-def main():
     """Main application function."""
     # Load CSS
     load_css()
     
     # Check authentication
-    if not st.session_state.get('is_authenticated', False):
-        PAGE_MODULES['auth'].show()
+    if not st.session_state.get('authenticated', False):
+        # Render login page
+        if 'auth' in PAGE_MODULES:
+            if hasattr(PAGE_MODULES['auth'], 'show') and asyncio.iscoroutinefunction(PAGE_MODULES['auth'].show):
+                await PAGE_MODULES['auth'].show()
+            else:
+                PAGE_MODULES['auth'].show()
+        else:
+            st.error("Authentication module not found")
         return
+    
+    # Get current page
+    current_page = st.session_state.get('current_page', 'Dashboard')
     
     # Create main layout
     col1, col2 = st.columns([1, 4])
@@ -515,7 +510,22 @@ def main():
     
     # Render the main content in the second column
     with col2:
-        render_main_content()
+        # Render the current page
+        if current_page in PAGES:
+            try:
+                page_config = PAGES[current_page]
+                # Check if module has an async show method
+                if hasattr(page_config["module"], 'show') and asyncio.iscoroutinefunction(page_config["module"].show):
+                    await page_config["module"].show()
+                else:
+                    page_config["module"].show()
+            except Exception as e:
+                st.error(f"Error loading page: {str(e)}")
+                logger.error(f"Error in page {current_page}: {str(e)}")
+        else:
+            st.warning("Page not found. Redirecting to dashboard...")
+            st.session_state.current_page = "Dashboard"
+            st.rerun()
     
     # Add footer
     st.markdown("""
@@ -528,6 +538,26 @@ def main():
             font-size: 0.8rem;
             border-top: 1px solid #e0e0e0;
         }
+        .stTextInput > div > div > input,
+        .stTextArea > div > div > textarea,
+        .stSelectbox > div > div > div,
+        .stNumberInput > div > div > input,
+        .stDateInput > div > div > input {
+            border-radius: 0.375rem;
+            border: 1px solid #d1d5db;
+            padding: 0.5rem 0.75rem;
+        }
+        
+        /* Table styling */
+        .stDataFrame {
+            border-radius: 0.5rem;
+            overflow: hidden;
+        }
+        
+        /* Hide Streamlit branding */
+        #MainMenu {visibility: hidden;}
+        footer {visibility: hidden;}
+        header {visibility: hidden;}
     </style>
     <div class="footer">
         2023 SDG Finance Platform | Version 1.0.0 | 
@@ -535,28 +565,30 @@ def main():
         <a href="#" style="color: #4b6cb7; text-decoration: none;">Terms</a> | 
         <a href="#" style="color: #4b6cb7; text-decoration: none;">Privacy</a>
     </div>
-            .stTextInput > div > div > input,
-            .stTextArea > div > div > textarea,
-            .stSelectbox > div > div > div,
-            .stNumberInput > div > div > input,
-            .stDateInput > div > div > input {
-                border-radius: 0.375rem;
-                border: 1px solid #d1d5db;
-                padding: 0.5rem 0.75rem;
-            }
-            
-            /* Table styling */
-            .stDataFrame {
-                border-radius: 0.5rem;
-                overflow: hidden;
-            }
-            
-            /* Hide Streamlit branding */
-            #MainMenu {visibility: hidden;}
-            footer {visibility: hidden;}
-            header {visibility: hidden;}
-        </style>
     """, unsafe_allow_html=True)
 
-if __name__ == "__main__":
+def run():
+    """Run the Streamlit app."""
+    # This is the main entry point for Streamlit
     asyncio.run(main())
+
+if __name__ == "__main__":
+    # For development, run the app directly
+    import streamlit.web.bootstrap
+    from streamlit.web.cli import _main_run
+    
+    # Set the Streamlit config
+    import sys
+    sys.argv = [
+        "streamlit", "run", 
+        str(Path(__file__).resolve()),
+        "--server.headless", "true",
+        "--server.port=8501",
+        "--server.address=0.0.0.0"
+    ]
+    
+    # Run the app
+    sys.exit(_main_run())
+    
+    # For production, you would typically just do:
+    # asyncio.run(main())
