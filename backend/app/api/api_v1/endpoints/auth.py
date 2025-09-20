@@ -4,14 +4,20 @@ from typing import Any, Dict, Optional
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
+from passlib.context import CryptContext
 
 from backend.app.core import security
 from backend.app.core.config import settings
 from backend.app.db.session import get_db
+from backend.app.db.models import User
 from backend.app.schemas.token import Token, TokenPayload
 from backend.app.schemas.user import UserCreate, UserInDB, UserResponse
 from backend.app.services import user as user_service
 from backend.app.services import auth as auth_service
+
+# Password hashing
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 router = APIRouter()
 
@@ -27,78 +33,65 @@ async def login_access_token(
     logger = logging.getLogger(__name__)
     
     try:
-        logger.info(f"Login attempt for username: {form_data.username}")
+        logger.info(f"Login attempt for user: {form_data.username}")
         
-        # Log database connection info (redacted for security)
-        logger.info("Database connection check...")
+        # Check if user exists with roles loaded
+        result = await db.execute(
+            select(User).where(User.email == form_data.username).options(selectinload(User.roles))
+        )
+        user = result.scalars().first()
         
-        # Check if database is accessible
-        try:
-            from sqlalchemy import text
-            await db.execute(text("SELECT 1"))
-            await db.commit()  # Ensure we commit the transaction
-            logger.info("Database connection successful")
-        except Exception as db_error:
-            logger.error(f"Database connection error: {str(db_error)}", exc_info=True)
+        if not user:
+            logger.warning(f"User not found: {form_data.username}")
             raise HTTPException(
-                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail="Database connection error. Please try again later."
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Incorrect email or password"
             )
+            
+        logger.info(f"User found: {user.email}, Active: {user.is_active}, Verified: {getattr(user, 'is_verified', False)}")
         
-        # Authenticate user
-        try:
-            user = await auth_service.authenticate(
-                db, email=form_data.username, password=form_data.password
-            )
-            
-            if not user:
-                logger.warning(f"Authentication failed for user: {form_data.username}")
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Incorrect email or password"
-                )
-                
-            if not user.is_active:
-                logger.warning(f"Inactive user attempted login: {form_data.username}")
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Account is inactive. Please contact support."
-                )
-                
-            # Create access token
-            access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
-            
-            # Get user roles
-            role_names = [role.name for role in user.roles] if user.roles else []
-            logger.info(f"User {user.email} logged in with roles: {role_names}")
-            
-            # Create token data
-            token_data = {
-                "access_token": security.create_access_token(
-                    user.id,
-                    expires_delta=access_token_expires,
-                    user_data={"email": user.email, "roles": role_names}
-                ),
-                "token_type": "bearer",
-            }
-            
-            logger.info("Login successful")
-            return token_data
-            
-        except HTTPException as http_exc:
-            # Re-raise HTTP exceptions
-            logger.warning(f"HTTP Exception: {str(http_exc.detail)}")
-            raise http_exc
-            
-        except Exception as auth_error:
-            logger.error(f"Authentication error: {str(auth_error)}", exc_info=True)
+        # Check if user is active
+        if not user.is_active:
+            logger.warning(f"Inactive user attempted login: {form_data.username}")
             raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Authentication failed. Please try again."
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Account is inactive. Please contact support."
             )
             
+        # Verify password directly
+        if not pwd_context.verify(form_data.password, user.hashed_password):
+            logger.warning(f"Invalid password for user: {form_data.username}")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Incorrect email or password"
+            )
+            
+        # If we get here, authentication was successful
+        logger.info(f"Password verified for user: {user.email}")
+        
+        # Create access token with user data
+        access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+        
+        # Get user roles
+        role_names = [role.name for role in user.roles] if hasattr(user, 'roles') and user.roles else []
+        logger.info(f"User {user.email} logged in with roles: {role_names}")
+        
+        # Create token data
+        token_data = {
+            "access_token": security.create_access_token(
+                user.id,
+                expires_delta=access_token_expires,
+                user_data={"email": user.email, "roles": role_names}
+            ),
+            "token_type": "bearer",
+        }
+            
+        logger.info("Login successful")
+        return token_data
+        
     except HTTPException as http_exc:
-        # Re-raise HTTP exceptions from outer try block
+        # Re-raise HTTP exceptions
+        logger.warning(f"HTTP Exception: {str(http_exc.detail)}")
         raise http_exc
         
     except Exception as e:

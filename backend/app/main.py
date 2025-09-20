@@ -262,15 +262,18 @@ async def init_db():
             logger.info("✅ Verified/Created roles: admin, user, donor")
 
             # --- USERS ---
+            # Create admin user with properly hashed password
+            admin_password = settings.FIRST_SUPERUSER_PASSWORD or "admin123"
             admin_user = User(
-                username=settings.FIRST_SUPERUSER,
-                email=settings.FIRST_SUPERUSER_EMAIL,
-                hashed_password=get_password_hash(settings.FIRST_SUPERUSER_PASSWORD or "admin123"),
+                username=settings.FIRST_SUPERUSER or "admin",
+                email=settings.FIRST_SUPERUSER_EMAIL or "admin@example.com",
+                hashed_password=pwd_context.hash(admin_password),
                 full_name="Admin User",
                 is_verified=True,
                 is_active=True,
                 roles=[admin_role, user_role, donor_role]
             )
+            logger.info(f"Created admin user with email: {admin_user.email}")
             user1 = User(
                 username="john_doe",
                 email="john@example.com",
@@ -294,27 +297,11 @@ async def init_db():
             # We'll use the enum values directly when creating transactions
             pass
             
-            # Create sample loan statuses
-            loan_statuses = [
-                LoanStatus(name="pending", description="Loan application is pending review"),
-                LoanStatus(name="approved", description="Loan has been approved"),
-                LoanStatus(name="rejected", description="Loan application was rejected"),
-                LoanStatus(name="disbursed", description="Loan amount has been disbursed"),
-                LoanStatus(name="repaid", description="Loan has been fully repaid")
-            ]
-            db.add_all(loan_statuses)
-            await db.commit()
+            # LoanStatus and NotificationType are enums, no need to create them
+            # They are already defined in models.py and can be used directly
             
-            # Create sample notification types
-            notification_types = [
-                NotificationType(name="loan_approved", description="Loan application approved"),
-                NotificationType(name="loan_rejected", description="Loan application rejected"),
-                NotificationType(name="payment_received", description="Payment received"),
-                NotificationType(name="system_alert", description="System alert"),
-                NotificationType(name="account_update", description="Account update")
-            ]
-            db.add_all(notification_types)
-            await db.commit()
+            # NotificationType is an enum, no need to create it
+            # It's already defined in models.py and can be used directly
             
             # Save all users
             db.add_all([admin_user, user1, user2])
