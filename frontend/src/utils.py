@@ -55,6 +55,7 @@ async def api_request(
         url = f"{API_BASE_URL}/{endpoint}"
     else:
         url = f"{FULL_API_URL}/{endpoint}" if endpoint else FULL_API_URL
+    
     headers = get_auth_headers()
     
     if form_data:
@@ -64,7 +65,8 @@ async def api_request(
         kwargs = {
             "headers": headers,
             "params": params or {},
-            "timeout": 30  # 30 seconds timeout
+            "timeout": 30,  # 30 seconds timeout
+            "verify": True  # Enable SSL verification
         }
         
         if data is not None:
@@ -74,6 +76,10 @@ async def api_request(
                 kwargs["json"] = data
         
         method = method.upper()
+        st.write(f"Making {method} request to: {url}")  # Debugging
+        st.write(f"Headers: {headers}")  # Debugging
+        st.write(f"Data: {data}")  # Debugging
+        
         if method == "GET":
             response = requests.get(url, **kwargs)
         elif method == "POST":
@@ -85,8 +91,20 @@ async def api_request(
         else:
             raise ValueError(f"Unsupported HTTP method: {method}")
         
+        st.write(f"Response status: {response.status_code}")  # Debugging
+        st.write(f"Response headers: {response.headers}")  # Debugging
+        
+        # Try to parse JSON response
+        try:
+            response_data = response.json()
+            st.write(f"Response data: {response_data}")  # Debugging
+        except ValueError:
+            response_data = response.text
+            st.write(f"Non-JSON response: {response_data}")  # Debugging
+        
         # Handle 401 Unauthorized with token refresh
         if response.status_code == 401 and retry_on_auth_failure and 'current_user' in st.session_state:
+            st.write("Received 401, attempting token refresh...")  # Debugging
             # Try to refresh the token
             refresh_token = st.session_state.current_user.get('refresh_token')
             if refresh_token:

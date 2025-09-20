@@ -35,7 +35,8 @@ def show_login_page():
                 if not email or not password:
                     st.error("Please fill in all fields")
                 else:
-                    login_user(email, password)
+                    import asyncio
+                    asyncio.run(login_user(email, password))
     
     with tab2:
         with st.form("register_form"):
@@ -94,6 +95,8 @@ async def login_user(email: str, password: str):
                 form_data=True,
                 retry_on_auth_failure=False  # Don't retry on auth failure for login
             )
+            
+            st.write("Login response:", token_response)  # Debugging line
             
             if not token_response or 'access_token' not in token_response:
                 st.error("❌ Invalid email or password")
