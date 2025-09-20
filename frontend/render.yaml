@@ -10,7 +10,7 @@ services:
     buildCommand: |
       pip install --upgrade pip
       pip install -r requirements.txt
-    startCommand: streamlit run src/app.py --server.port=$PORT --server.address=0.0.0.0
+    startCommand: streamlit run frontend/src/app.py --server.port=$PORT --server.address=0.0.0.0
     envVars:
       - key: PORT
         value: 8501
