@@ -12,7 +12,9 @@ services:
       - key: PYTHONUNBUFFERED
         value: true
       - key: API_BASE_URL
-        value: https://plp-final-project-bgex.onrender.com/api/v1
+        value: https://plp-final-project-bgex.onrender.com
+      - key: API_PREFIX
+        value: /api/v1
       - key: JWT_SECRET_KEY
         generateValue: true
       - key: ENVIRONMENT

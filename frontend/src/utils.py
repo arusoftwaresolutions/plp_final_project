@@ -13,7 +13,9 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # API configuration
-API_BASE_URL = os.getenv("API_BASE_URL", "https://plp-final-project-bgex.onrender.com/api/v1")
+API_BASE_URL = os.getenv("API_BASE_URL", "https://plp-final-project-bgex.onrender.com").rstrip('/')
+API_PREFIX = os.getenv("API_PREFIX", "/api/v1").strip('/')
+FULL_API_URL = f"{API_BASE_URL}/{API_PREFIX}"
 
 def get_auth_headers() -> Dict[str, str]:
     """Get the authentication headers with the JWT token.
@@ -47,7 +49,12 @@ async def api_request(
     Returns:
         Response data as dict/list or None if request failed
     """
-    url = f"{API_BASE_URL.rstrip('/')}/{endpoint.lstrip('/')}"
+    # Construct URL using base URL and endpoint
+    endpoint = endpoint.lstrip('/')
+    if endpoint.startswith(API_PREFIX):
+        url = f"{API_BASE_URL}/{endpoint}"
+    else:
+        url = f"{FULL_API_URL}/{endpoint}" if endpoint else FULL_API_URL
     headers = get_auth_headers()
     
     if form_data:
@@ -146,7 +153,7 @@ async def refresh_access_token(refresh_token: str) -> Optional[Dict[str, Any]]:
         }
         
         response = requests.post(
-            f"{API_BASE_URL}/auth/refresh-token",
+            f"{FULL_API_URL}/auth/refresh-token",
             data=token_data,
             timeout=30
         )
