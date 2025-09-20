@@ -113,15 +113,72 @@ class State:
 if 'state' not in st.session_state:
     st.session_state.state = State()
 
-# Initialize other session state variables
-if 'show_create_campaign' not in st.session_state:
-    st.session_state.show_create_campaign = False
-if 'show_organizations' not in st.session_state:
-    st.session_state.show_organizations = False
-if 'show_learn_more' not in st.session_state:
-    st.session_state.show_learn_more = False
-if 'eligibility' not in st.session_state:
-    st.session_state.eligibility = None
+# Initialize session variables
+for var in ['show_create_campaign', 'show_organizations', 'show_learn_more', 'eligibility']:
+    if var not in st.session_state:
+        st.session_state[var] = None
+
+# Show sidebar only if user is authenticated
+if hasattr(st.session_state.state, 'is_authenticated') and st.session_state.state.is_authenticated:
+    # Navigation menu
+    with st.sidebar:
+        st.image("assets/logo.png", width=200)
+        st.title("Poverty Alleviation")
+        
+        # Show user info
+        if hasattr(st.session_state.state, 'user') and st.session_state.state.user:
+            st.markdown(f"### Welcome, {st.session_state.state.user.get('username', 'User')}")
+        
+        # Navigation menu
+        menu_options = [
+            "Dashboard",
+            "Transactions",
+            "Loans",
+            "Crowdfunding",
+            "Insights",
+            "Settings"
+        ]
+        
+        # Add admin menu if user is admin
+        if hasattr(st.session_state.state, 'is_admin') and st.session_state.state.is_admin:
+            menu_options.append("Admin")
+        
+        selected = option_menu(
+            menu_title=None,
+            options=menu_options,
+            icons=[
+                "house", "cash-coin", "bank", "people", "graph-up", "gear", "shield-lock"
+            ][:len(menu_options)],
+            default_index=0,
+            styles={
+                "container": {"padding": "0!important", "background-color": "#f8f9fa"},
+                "nav-link": {"font-size": "14px", "text-align": "left", "margin": "5px 0", "border-radius": "5px"},
+                "nav-link-selected": {"background-color": "#0d6efd"},
+            }
+        )
+        
+        # Logout button
+        if st.button("Logout", use_container_width=True, type="primary"):
+            st.session_state.state = State()
+            st.experimental_rerun()
+            
+        # Add some space at the bottom
+        st.markdown("---")
+        st.markdown("### Quick Actions")
+        
+        # Quick action buttons
+        if st.button("💳 New Transaction", use_container_width=True):
+            st.session_state.show_new_transaction = True
+            
+        if st.button("📝 Apply for Loan", use_container_width=True):
+            st.session_state.show_loan_application = True
+            
+        if st.button("🎯 Create Campaign", use_container_width=True):
+            st.session_state.show_create_campaign = True
+        
+        # Add footer
+        st.markdown("---")
+        st.caption(f"v1.0.0 • {datetime.now().year} © Poverty Alleviation Platform")
 
 def main():
     # Check authentication
