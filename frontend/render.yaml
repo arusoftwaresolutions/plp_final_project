@@ -15,7 +15,7 @@ services:
       - key: PORT
         value: 8501
       - key: BACKEND_URL
-        value: https://your-backend-url.onrender.com  # Update this with your actual backend URL
+        value: https://plp-final-project-bgex.onrender.com/  # Update this with your actual backend URL
       - key: STREAMLIT_SERVER_HEADLESS
         value: "true"
       - key: STREAMLIT_SERVER_PORT
