@@ -51,8 +51,8 @@ class Settings(BaseSettings):
         db_name = os.getenv("PGDATABASE")
         
         if all([db_host, db_user, db_password, db_name]):
-            # Use psycopg3 driver for async operations
-            DATABASE_URL = f"postgresql+psycopg://{db_user}:{db_password}@{db_host}:{db_port}/{db_name}"
+            # Use asyncpg driver for async operations with Render
+            DATABASE_URL = f"postgresql+asyncpg://{db_user}:{db_password}@{db_host}:{db_port}/{db_name}?sslmode=require"
         else:
             # Fallback to local development database
             DATABASE_URL = "postgresql+asyncpg://postgres:postgres@localhost:5432/sdg"
@@ -74,14 +74,9 @@ class Settings(BaseSettings):
         parsed = urlparse(db_url)
         query_params = parse_qs(parsed.query)
         
-        # Remove any unsupported parameters for asyncpg
-        for param in ['sslmode', 'connect_timeout', 'timeout']:
-            if param in query_params:
-                del query_params[param]
-        
-        # Handle SSL for production
-        if self.ENVIRONMENT == "production" and 'ssl' not in query_params:
-            query_params['ssl'] = ['require']
+        # Ensure sslmode is set for production
+        if self.ENVIRONMENT == "production" and 'sslmode' not in query_params:
+            query_params['sslmode'] = ['require']
         
         # Rebuild the URL with filtered parameters
         filtered_query = '&'.join(
@@ -91,12 +86,13 @@ class Settings(BaseSettings):
         db_url = urlunparse(parsed._replace(query=filtered_query))
         
         # Redact password in logs
-        if '@' in db_url:
-            parts = db_url.split('@')
-            redacted_url = f"{parts[0].split('://')[0]}://*****:*****@{'@'.join(parts[1:])}"
-            print(f"[Config] Using database URL: {redacted_url}", flush=True)
+        if parsed.password:
+            redacted_netloc = f"{parsed.username}:*****@{parsed.hostname}"
+            if parsed.port:
+                redacted_netloc += f":{parsed.port}"
+            print(f"[Config] Using database: {parsed.scheme}://{redacted_netloc}{parsed.path}", flush=True)
         else:
-            print(f"[Config] Using database URL: {db_url}", flush=True)
+            print(f"[Config] Using database: {db_url}", flush=True)
         
         return db_url
 

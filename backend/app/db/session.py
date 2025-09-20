@@ -16,25 +16,51 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-async def wait_for_db(db_url: str, max_retries: int = 5, delay: int = 5) -> bool:
+async def wait_for_db(db_url: str, max_retries: int = 10, delay: int = 5) -> bool:
     """Wait for database to become available."""
     from sqlalchemy import text
     from sqlalchemy.ext.asyncio import create_async_engine
+    import ssl
+    
+    # Configure SSL for the connection
+    ssl_context = ssl.create_default_context()
+    ssl_context.check_hostname = False
+    ssl_context.verify_mode = ssl.CERT_NONE
+    
+    connect_args = {
+        "connect_timeout": 10,
+        "ssl": ssl_context
+    }
     
     for attempt in range(max_retries):
         try:
-            temp_engine = create_async_engine(db_url, connect_args={"connect_timeout": 5})
+            # Create a new engine for the connection test
+            temp_engine = create_async_engine(
+                db_url,
+                connect_args=connect_args,
+                pool_pre_ping=True
+            )
+            
+            # Test the connection
             async with temp_engine.connect() as conn:
                 await conn.execute(text("SELECT 1"))
                 logger.info("✅ Database connection successful")
-                await temp_engine.dispose()
-                return True
+                await conn.close()
+            
+            # Clean up
+            await temp_engine.dispose()
+            return True
+            
         except Exception as e:
             if attempt == max_retries - 1:
                 logger.error(f"❌ Failed to connect to database after {max_retries} attempts")
+                logger.error(f"Last error: {str(e)}")
                 return False
+                
             logger.warning(f"⚠️ Database not ready, retrying in {delay} seconds... (Attempt {attempt + 1}/{max_retries})")
+            logger.debug(f"Connection error: {str(e)}")
             await asyncio.sleep(delay)
+    
     return False
 
 def create_db_engine():
@@ -42,31 +68,33 @@ def create_db_engine():
     try:
         db_url = settings.DATABASE
         
+        # Parse the URL to check for SSL parameters
+        from urllib.parse import urlparse, parse_qs, urlunparse
+        parsed = urlparse(db_url)
+        
         # Redact password in logs
-        if "@" in db_url:
-            parts = db_url.split("@")
-            redacted_url = f"{parts[0].split('://')[0]}://*****:*****@{'@'.join(parts[1:])}"
-            logger.info(f"Connecting to database: {redacted_url}")
+        if parsed.password:
+            redacted_netloc = f"{parsed.username}:*****@{parsed.hostname}"
+            if parsed.port:
+                redacted_netloc += f":{parsed.port}"
+            logger.info(f"Connecting to database: {parsed.scheme}://{redacted_netloc}{parsed.path}")
         else:
             logger.info(f"Connecting to database: {db_url}")
 
-        # Parse the URL to check for SSL parameters
-        from urllib.parse import urlparse, parse_qs
-        parsed = urlparse(db_url)
-        query_params = parse_qs(parsed.query)
-        
-        # Prepare connect_args based on URL parameters
+        # Handle SSL for Render PostgreSQL
         connect_args = {}
-        
-        # Handle SSL if specified in the URL
-        if 'ssl' in query_params:
-            ssl_value = query_params['ssl'][0].lower()
-            if ssl_value == 'require':
-                import ssl
-                ssl_context = ssl.create_default_context()
-                ssl_context.check_hostname = False
-                ssl_context.verify_mode = ssl.CERT_NONE
-                connect_args['ssl'] = ssl_context
+        if 'render.com' in db_url or 'ssl' in db_url.lower():
+            import ssl
+            ssl_context = ssl.create_default_context()
+            ssl_context.check_hostname = False
+            ssl_context.verify_mode = ssl.CERT_NONE
+            connect_args['ssl'] = ssl_context
+            
+            # Ensure the URL has the correct SSL parameters
+            query = parse_qs(parsed.query)
+            query['sslmode'] = 'require'
+            parsed = parsed._replace(query='')
+            db_url = urlunparse(parsed) + '?sslmode=require'
         
         # Configure connection pool and timeouts
         engine = create_async_engine(
@@ -77,7 +105,11 @@ def create_db_engine():
             pool_size=5,         # Number of connections to keep open
             max_overflow=10,     # Max number of connections to create beyond pool_size
             pool_timeout=30,     # Max seconds to wait for a connection
-            connect_args=connect_args
+            connect_args=connect_args,
+            # Add execution options for better debugging
+            execution_options={
+                "isolation_level": "AUTOCOMMIT"
+            }
         )
         
         logger.info("✅ Database engine created successfully")
