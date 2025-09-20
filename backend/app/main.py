@@ -561,15 +561,26 @@ async def on_startup():
         
         # Initialize database with seed data
         logger.info("🌱 Seeding database...")
-        await init_db()
+        try:
+            await init_db()
+            logger.info("✅ Database seeding completed successfully")
+        except Exception as seed_error:
+            logger.error(f"⚠️ Error during database seeding: {seed_error}")
+            logger.error(traceback.format_exc())
         
         # Ensure admin user exists
-        await ensure_admin_user()
+        try:
+            await ensure_admin_user()
+            logger.info("✅ Admin user check completed")
+        except Exception as admin_error:
+            logger.error(f"⚠️ Error ensuring admin user: {admin_error}")
+            logger.error(traceback.format_exc())
         
         logger.info("✅ Database initialization complete")
         
     except Exception as e:
         logger.error(f"❌ Failed to initialize database: {e}")
+        logger.error(traceback.format_exc())
         raise
 
 
