@@ -34,13 +34,15 @@ async def login_access_token(
         
         # Check if database is accessible
         try:
-            await db.execute("SELECT 1")
+            from sqlalchemy import text
+            await db.execute(text("SELECT 1"))
+            await db.commit()  # Ensure we commit the transaction
             logger.info("Database connection successful")
         except Exception as db_error:
-            logger.error(f"Database connection error: {str(db_error)}")
+            logger.error(f"Database connection error: {str(db_error)}", exc_info=True)
             raise HTTPException(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail="Database connection error"
+                detail=f"Database connection error: {str(db_error)}"
             )
         
         # Authenticate user
