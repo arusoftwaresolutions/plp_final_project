@@ -1,14 +1,41 @@
+import asyncio
+import logging
+import os
+from typing import AsyncGenerator, Optional
+
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 from sqlalchemy.orm import declarative_base
-import logging
-from typing import AsyncGenerator, Optional
-import os
+from sqlalchemy.exc import OperationalError, SQLAlchemyError
 
 from backend.app.core.config import settings
 
 # Configure logging
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+)
 logger = logging.getLogger(__name__)
+
+async def wait_for_db(db_url: str, max_retries: int = 5, delay: int = 5) -> bool:
+    """Wait for database to become available."""
+    from sqlalchemy import text
+    from sqlalchemy.ext.asyncio import create_async_engine
+    
+    for attempt in range(max_retries):
+        try:
+            temp_engine = create_async_engine(db_url, connect_args={"connect_timeout": 5})
+            async with temp_engine.connect() as conn:
+                await conn.execute(text("SELECT 1"))
+                logger.info("✅ Database connection successful")
+                await temp_engine.dispose()
+                return True
+        except Exception as e:
+            if attempt == max_retries - 1:
+                logger.error(f"❌ Failed to connect to database after {max_retries} attempts")
+                return False
+            logger.warning(f"⚠️ Database not ready, retrying in {delay} seconds... (Attempt {attempt + 1}/{max_retries})")
+            await asyncio.sleep(delay)
+    return False
 
 def create_db_engine():
     """Create and return an async database engine with proper configuration."""
@@ -53,10 +80,10 @@ def create_db_engine():
             connect_args=connect_args
         )
         
-        logger.info("Database engine created successfully")
+        logger.info("✅ Database engine created successfully")
         return engine
     except Exception as e:
-        logger.error(f"Failed to create database engine: {str(e)}")
+        logger.error(f"❌ Failed to create database engine: {str(e)}")
         logger.exception("Database engine creation failed with exception:")
         raise
 
@@ -71,6 +98,20 @@ AsyncSessionLocal = async_sessionmaker(
     autocommit=False,
     autoflush=False,
 )
+
+# Dependency for DB session
+async def get_db() -> AsyncGenerator[AsyncSession, None]:
+    """Get database session with automatic cleanup."""
+    session = AsyncSessionLocal()
+    try:
+        yield session
+        await session.commit()
+    except SQLAlchemyError as e:
+        await session.rollback()
+        logger.error(f"Database error: {str(e)}")
+        raise
+    finally:
+        await session.close()
 
 # Base class for models
 Base = declarative_base()

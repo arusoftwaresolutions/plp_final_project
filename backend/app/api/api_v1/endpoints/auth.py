@@ -23,34 +23,84 @@ async def login_access_token(
     """
     OAuth2 compatible token login, get an access token for future requests
     """
-    user = await auth_service.authenticate(
-        db, email=form_data.username, password=form_data.password
-    )
-    if not user:
+    import logging
+    logger = logging.getLogger(__name__)
+    
+    try:
+        logger.info(f"Login attempt for username: {form_data.username}")
+        
+        # Log database connection info
+        logger.info(f"Database URL: {settings.DATABASE}")
+        
+        # Check if database is accessible
+        try:
+            await db.execute("SELECT 1")
+            logger.info("Database connection successful")
+        except Exception as db_error:
+            logger.error(f"Database connection error: {str(db_error)}")
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Database connection error"
+            )
+        
+        # Authenticate user
+        try:
+            user = await auth_service.authenticate(
+                db, email=form_data.username, password=form_data.password
+            )
+            logger.info(f"User authentication result: {user is not None}")
+            
+            if not user:
+                logger.warning(f"Authentication failed for user: {form_data.username}")
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Incorrect email or password"
+                )
+                
+            if not user.is_active:
+                logger.warning(f"Inactive user attempted login: {form_data.username}")
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Inactive user"
+                )
+                
+            # Create access token
+            access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+            
+            # Get user roles
+            role_names = [role.name for role in user.roles] if user.roles else []
+            logger.info(f"User roles: {role_names}")
+            
+            # Create token
+            token_data = {
+                "access_token": security.create_access_token(
+                    user.id,
+                    expires_delta=access_token_expires,
+                    user_data={"email": user.email, "roles": role_names}
+                ),
+                "token_type": "bearer",
+            }
+            
+            logger.info("Login successful")
+            return token_data
+            
+        except HTTPException as http_exc:
+            # Re-raise HTTP exceptions
+            raise http_exc
+            
+        except Exception as auth_error:
+            logger.error(f"Authentication error: {str(auth_error)}", exc_info=True)
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Authentication error: {str(auth_error)}"
+            )
+            
+    except Exception as e:
+        logger.error(f"Unexpected error in login endpoint: {str(e)}", exc_info=True)
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Incorrect email or password"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="An unexpected error occurred"
         )
-    elif not user.is_active:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Inactive user"
-        )
-    
-    # Create access token
-    access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
-    
-    # Get user roles
-    role_names = [role.name for role in user.roles] if user.roles else []
-    
-    return {
-        "access_token": security.create_access_token(
-            user.id,
-            expires_delta=access_token_expires,
-            user_data={"email": user.email, "roles": role_names}
-        ),
-        "token_type": "bearer",
-    }
 
 @router.post("/login/test-token", response_model=UserResponse)
 async def test_token(

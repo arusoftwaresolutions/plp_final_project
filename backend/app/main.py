@@ -1,52 +1,189 @@
-from typing import Optional
-from fastapi import FastAPI
+import asyncio
+import logging
+import sys
+import traceback
+from typing import Optional, Dict, Any, List
+
+from fastapi import FastAPI, Request, status, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from fastapi.exceptions import RequestValidationError
+from starlette.exceptions import HTTPException as StarletteHTTPException
+from sqlalchemy import select, text
+from sqlalchemy.exc import SQLAlchemyError, OperationalError
+
 from backend.app.core.config import settings
+from backend.app.db.session import AsyncSessionLocal, engine, wait_for_db
+from backend.app.db.models import Base
 
 # Import and include API router
 from backend.app.api.api_v1.api import api_router
 from backend.app.db.session import engine, AsyncSessionLocal, Base
 import traceback
 
-# Create app only ONCE
-app = FastAPI(
-    title="Poverty Alleviation Platform API",
-    description="API for the Poverty Alleviation Platform",
-    version="1.0.0",
-    docs_url="/docs",
-    redoc_url="/redoc"
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    handlers=[
+        logging.StreamHandler(sys.stdout)
+    ]
 )
+logger = logging.getLogger(__name__)
 
-# Add CORS middleware
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],  # Allow all origins for now
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+def create_application() -> FastAPI:
+    """
+    Create and configure the FastAPI application.
+    This function is used to ensure proper initialization order.
+    """
+    app = FastAPI(
+        title="Poverty Alleviation Platform API",
+        description="API for the Poverty Alleviation Platform",
+        version="1.0.0",
+        docs_url="/docs",
+        redoc_url="/redoc",
+        debug=settings.DEBUG
+    )
+    
+    # Add CORS middleware
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],  # In production, replace with specific origins
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+    
+    return app
 
-# Root endpoint
-@app.get("/")
-async def root():
-    return {
-        "message": "Welcome to the Poverty Alleviation Platform API",
-        "documentation": {
-            "swagger": "/docs",
-            "redoc": "/redoc"
-        },
-        "status": "operational",
-        "version": "1.0.0"
-    }
+# Create the FastAPI application
+app = create_application()
+
+# Add request logging middleware
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    logger.info(f"Request: {request.method} {request.url}")
+    logger.debug(f"Headers: {request.headers}")
+    
+    try:
+        body = await request.body()
+        if body:
+            logger.debug(f"Request body: {body.decode()}")
+    except Exception as e:
+        logger.warning(f"Could not log request body: {str(e)}")
+    
+    response = await call_next(request)
+    logger.info(f"Response status: {response.status_code}")
+    return response
+
+# Add exception handler for unhandled exceptions
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    logger.error(f"Unhandled exception: {str(exc)}", exc_info=True)
+    return JSONResponse(
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        content={"detail": "Internal server error"},
+    )
+
+# Add HTTP exception handler
+@app.exception_handler(StarletteHTTPException)
+async def http_exception_handler(request: Request, exc: StarletteHTTPException):
+    logger.warning(f"HTTP Exception: {exc.detail}")
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={"detail": exc.detail},
+    )
+
+# Add validation exception handler
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    logger.warning(f"Validation error: {exc.errors()}")
+    return JSONResponse(
+        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        content={"detail": exc.errors()},
+    )
+
+async def check_database_setup() -> bool:
+    """Check if the database is properly set up and has an admin user."""
+    from backend.app.db.models import User
+    
+    try:
+        async with AsyncSessionLocal() as db:
+            # Check if users table exists
+            await db.execute(text("SELECT 1 FROM users LIMIT 1"))
+            
+            # Check if admin user exists
+            stmt = select(User).where(User.email == settings.FIRST_SUPERUSER_EMAIL)
+            result = await db.execute(stmt)
+            admin_user = result.scalar_one_or_none()
+            
+            return {
+                "database_initialized": True,
+                "admin_user_exists": admin_user is not None,
+                "admin_user_active": admin_user.is_active if admin_user else False
+            }
+    except Exception as e:
+        logger.error(f"Database setup check failed: {e}")
+        return {
+            "database_initialized": False,
+            "admin_user_exists": False,
+            "admin_user_active": False,
+            "error": str(e)
+        }
 
 # Health check endpoint
 @app.get("/health")
-async def health_check():
-    return {
-        "status": "ok",
-        "version": "1.0.0",
-        "environment": settings.ENVIRONMENT
-    }
+async def health_check() -> Dict[str, Any]:
+    """Health check endpoint for monitoring."""
+    try:
+        # Check database connection
+        async with AsyncSessionLocal() as db:
+            await db.execute(text("SELECT 1"))
+        
+        return {
+            "status": "healthy",
+            "database": "connected"
+        }
+    except Exception as e:
+        logger.error(f"Health check failed: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Service unavailable - database connection failed"
+        )
+
+# Root endpoint
+@app.get("/")
+async def root() -> Dict[str, Any]:
+    """Root endpoint with API information."""
+    # Check database status
+    try:
+        db_status = await check_database_setup()
+        
+        return {
+            "message": "Welcome to the Poverty Alleviation Platform API",
+            "documentation": {
+                "swagger": "/docs",
+                "redoc": "/redoc"
+            },
+            "status": "operational",
+            "database": {
+                "initialized": db_status["database_initialized"],
+                "admin_user_exists": db_status["admin_user_exists"],
+                "admin_user_active": db_status["admin_user_active"]
+            }
+        }
+    except Exception as e:
+        logger.error(f"Root endpoint error: {e}")
+        return {
+            "message": "Welcome to the Poverty Alleviation Platform API",
+            "status": "degraded",
+            "environment": settings.ENVIRONMENT,
+            "error": "Unable to check database status",
+            "documentation": {
+                "swagger": "/docs",
+                "redoc": "/redoc"
+            }
+        }
 
 # Include API router
 app.include_router(api_router, prefix=settings.API_V1_STR)
@@ -66,6 +203,7 @@ def safe_int(val: Optional[str], default: int) -> int:
 
 # Database seeding function
 async def init_db():
+    """Initialize the database with sample data."""
     from datetime import datetime, timedelta
     import json
     from sqlalchemy import select
@@ -79,16 +217,29 @@ async def init_db():
     from backend.app.core.security import get_password_hash
 
     pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+    
+    # Check if database is already initialized
+    async with AsyncSessionLocal() as db:
+        result = await db.execute(select(Role))
+        if result.scalars().first() is not None:
+            logger.info("Database already initialized, skipping sample data seeding")
+            return
+            
+    logger.info("🌱 Seeding database with sample data...")
 
     try:
         async with AsyncSessionLocal() as db:
-            # Check if already seeded
-            result = await db.execute(select(Role).limit(1))
-            if result.scalars().first() is not None:
-                print("[Startup] Database already initialized, skipping seeding")
-                return
-
-            print("[Startup] Creating sample data...")
+            # Create roles
+            admin_role = Role(name="admin", description="Administrator with full access")
+            user_role = Role(name="user", description="Regular user")
+            donor_role = Role(name="donor", description="Donor user")
+            db.add_all([admin_role, user_role, donor_role])
+            await db.commit()
+            await db.refresh(admin_role)
+            await db.refresh(user_role)
+            await db.refresh(donor_role)
+            
+            logger.info("✅ Created roles: admin, user, donor")
 
             # --- ROLES ---
             admin_role = Role(name="admin", description="Administrator with full access")
@@ -101,7 +252,7 @@ async def init_db():
             admin_user = User(
                 username=settings.FIRST_SUPERUSER,
                 email=settings.FIRST_SUPERUSER_EMAIL,
-                hashed_password=get_password_hash(settings.FIRST_SUPERUSER_PASSWORD),
+                hashed_password=get_password_hash(settings.FIRST_SUPERUSER_PASSWORD or "admin123"),
                 full_name="Admin User",
                 is_verified=True,
                 is_active=True,
@@ -125,8 +276,44 @@ async def init_db():
                 is_active=True,
                 roles=[user_role, donor_role]
             )
+            # Create sample transaction categories
+            categories = [
+                TransactionCategory(name="Food & Groceries", description="Food and grocery expenses"),
+                TransactionCategory(name="Transportation", description="Transportation costs"),
+                TransactionCategory(name="Housing", description="Rent and housing expenses"),
+                TransactionCategory(name="Healthcare", description="Medical and healthcare expenses"),
+                TransactionCategory(name="Education", description="Education-related expenses")
+            ]
+            db.add_all(categories)
+            await db.commit()
+            
+            # Create sample loan statuses
+            loan_statuses = [
+                LoanStatus(name="pending", description="Loan application is pending review"),
+                LoanStatus(name="approved", description="Loan has been approved"),
+                LoanStatus(name="rejected", description="Loan application was rejected"),
+                LoanStatus(name="disbursed", description="Loan amount has been disbursed"),
+                LoanStatus(name="repaid", description="Loan has been fully repaid")
+            ]
+            db.add_all(loan_statuses)
+            await db.commit()
+            
+            # Create sample notification types
+            notification_types = [
+                NotificationType(name="loan_approved", description="Loan application approved"),
+                NotificationType(name="loan_rejected", description="Loan application rejected"),
+                NotificationType(name="payment_received", description="Payment received"),
+                NotificationType(name="system_alert", description="System alert"),
+                NotificationType(name="account_update", description="Account update")
+            ]
+            db.add_all(notification_types)
+            await db.commit()
+            
+            # Save all users
             db.add_all([admin_user, user1, user2])
             await db.commit()
+            
+            logger.info("✅ Created sample users and configuration data")
 
             # --- TRANSACTIONS ---
             today = datetime.utcnow()
@@ -288,16 +475,94 @@ async def init_db():
         traceback.print_exc()
 
 
-# Startup event (only one place now)
+async def check_database_connection() -> bool:
+    """Check if the database is accessible."""
+    try:
+        async with AsyncSessionLocal() as db:
+            await db.execute(text("SELECT 1"))
+        return True
+    except Exception as e:
+        logger.error(f"❌ Database connection error: {e}")
+        return False
+
+async def ensure_admin_user() -> bool:
+    """Ensure the admin user exists in the database."""
+    from backend.app.db.models import User, Role
+    from backend.app.core.security import get_password_hash
+    
+    try:
+        async with AsyncSessionLocal() as db:
+            # Check if admin role exists
+            result = await db.execute(select(Role).filter(Role.name == "admin"))
+            admin_role = result.scalars().first()
+            
+            if not admin_role:
+                logger.info("Creating admin role...")
+                admin_role = Role(name="admin", description="Administrator with full access")
+                db.add(admin_role)
+                await db.commit()
+                await db.refresh(admin_role)
+            
+            # Check if admin user exists
+            result = await db.execute(select(User).filter(User.email == settings.FIRST_SUPERUSER_EMAIL))
+            admin_user = result.scalars().first()
+            
+            if not admin_user:
+                logger.info("Creating admin user...")
+                admin_user = User(
+                    username=settings.FIRST_SUPERUSER,
+                    email=settings.FIRST_SUPERUSER_EMAIL,
+                    hashed_password=get_password_hash(settings.FIRST_SUPERUSER_PASSWORD),
+                    full_name="Admin User",
+                    is_verified=True,
+                    is_active=True,
+                    roles=[admin_role]
+                )
+                db.add(admin_user)
+                await db.commit()
+                logger.info("✅ Admin user created successfully")
+            else:
+                logger.info("✅ Admin user already exists")
+                
+            return True
+            
+    except Exception as e:
+        logger.error(f"❌ Failed to ensure admin user: {e}")
+        return False
+
 @app.on_event("startup")
 async def on_startup():
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-    await init_db()
-    print("✅ Database ready")
+    """Initialize application services on startup."""
+    logger.info("🚀 Starting application...")
+    
+    # Wait for database to be ready
+    logger.info("🔍 Checking database connection...")
+    if not await wait_for_db(settings.DATABASE):
+        logger.error("❌ Failed to connect to database. Please check your database settings.")
+        return
+    
+    try:
+        # Create database tables
+        logger.info("🔄 Creating database tables...")
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+        
+        # Initialize database with seed data
+        logger.info("🌱 Seeding database...")
+        await init_db()
+        
+        # Ensure admin user exists
+        await ensure_admin_user()
+        
+        logger.info("✅ Database initialization complete")
+        
+    except Exception as e:
+        logger.error(f"❌ Failed to initialize database: {e}")
+        raise
 
 
 # Run locally
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("backend.app.main:app", host="0.0.0.0", port=8000, reload=True)
+ss
