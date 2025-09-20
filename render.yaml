@@ -102,7 +102,7 @@ services:
         
       # CORS - update with your frontend URL
       - key: BACKEND_CORS_ORIGINS
-        value: '["http://localhost:3000"]'
+        value: '["https://poverty-alleviation.onrender.com","http://localhost:3000"]'
 
 # Database configuration
 databases:
