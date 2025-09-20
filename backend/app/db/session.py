@@ -20,17 +20,24 @@ async def wait_for_db(db_url: str, max_retries: int = 10, delay: int = 5) -> boo
     """Wait for database to become available."""
     from sqlalchemy import text
     from sqlalchemy.ext.asyncio import create_async_engine
+    from urllib.parse import urlparse, parse_qs
     import ssl
     
-    # Configure SSL for the connection
-    ssl_context = ssl.create_default_context()
-    ssl_context.check_hostname = False
-    ssl_context.verify_mode = ssl.CERT_NONE
+    # Parse the URL to check for SSL parameters
+    parsed = urlparse(db_url)
+    query_params = parse_qs(parsed.query)
     
+    # Configure SSL for the connection if needed
     connect_args = {
-        "connect_timeout": 10,
-        "ssl": ssl_context
+        "connect_timeout": 10
     }
+    
+    # Only configure SSL if explicitly requested or using Render
+    if 'ssl=require' in db_url.lower() or 'render.com' in db_url:
+        ssl_context = ssl.create_default_context()
+        ssl_context.check_hostname = False
+        ssl_context.verify_mode = ssl.CERT_NONE
+        connect_args["ssl"] = ssl_context
     
     for attempt in range(max_retries):
         try:
@@ -81,20 +88,27 @@ def create_db_engine():
         else:
             logger.info(f"Connecting to database: {db_url}")
 
-        # Handle SSL for Render PostgreSQL
+        # Handle SSL for Render PostgreSQL - use ssl=require for asyncpg
         connect_args = {}
-        if 'render.com' in db_url or 'ssl' in db_url.lower():
+        if 'render.com' in db_url or 'ssl=require' in db_url.lower():
             import ssl
             ssl_context = ssl.create_default_context()
             ssl_context.check_hostname = False
             ssl_context.verify_mode = ssl.CERT_NONE
             connect_args['ssl'] = ssl_context
             
-            # Ensure the URL has the correct SSL parameters
+            # Ensure the URL has the correct SSL parameters for asyncpg
             query = parse_qs(parsed.query)
-            query['sslmode'] = 'require'
-            parsed = parsed._replace(query='')
-            db_url = urlunparse(parsed) + '?sslmode=require'
+            if 'sslmode' in query:
+                # Convert sslmode=require to ssl=require for asyncpg
+                if query['sslmode'][0] == 'require':
+                    query['ssl'] = ['require']
+                del query['sslmode']
+            
+            # Rebuild the URL with updated query parameters
+            filtered_query = '&'.join(f"{k}={v[0]}" for k, v in query.items())
+            parsed = parsed._replace(query=filtered_query)
+            db_url = urlunparse(parsed)
         
         # Configure connection pool and timeouts
         engine = create_async_engine(

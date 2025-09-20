@@ -9,6 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
 from starlette.exceptions import HTTPException as StarletteHTTPException
+from urllib.parse import urlparse
 from sqlalchemy import select, text
 from sqlalchemy.exc import SQLAlchemyError, OperationalError
 
@@ -535,9 +536,20 @@ async def on_startup():
     """Initialize application services on startup."""
     logger.info("🚀 Starting application...")
     
+    # Log database URL (with redacted password)
+    db_url = settings.DATABASE
+    parsed = urlparse(db_url)
+    if parsed.password:
+        redacted_netloc = f"{parsed.username}:*****@{parsed.hostname}"
+        if parsed.port:
+            redacted_netloc += f":{parsed.port}"
+        logger.info(f"🔍 Connecting to database: {parsed.scheme}://{redacted_netloc}{parsed.path}")
+    else:
+        logger.info(f"🔍 Connecting to database: {db_url}")
+    
     # Wait for database to be ready
     logger.info("🔍 Checking database connection...")
-    if not await wait_for_db(settings.DATABASE):
+    if not await wait_for_db(db_url):
         logger.error("❌ Failed to connect to database. Please check your database settings.")
         return
     

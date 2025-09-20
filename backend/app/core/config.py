@@ -52,7 +52,8 @@ class Settings(BaseSettings):
         
         if all([db_host, db_user, db_password, db_name]):
             # Use asyncpg driver for async operations with Render
-            DATABASE_URL = f"postgresql+asyncpg://{db_user}:{db_password}@{db_host}:{db_port}/{db_name}?sslmode=require"
+            # Note: asyncpg uses 'ssl=require' not 'sslmode=require'
+            DATABASE_URL = f"postgresql+asyncpg://{db_user}:{db_password}@{db_host}:{db_port}/{db_name}?ssl=require"
         else:
             # Fallback to local development database
             DATABASE_URL = "postgresql+asyncpg://postgres:postgres@localhost:5432/sdg"
@@ -74,9 +75,15 @@ class Settings(BaseSettings):
         parsed = urlparse(db_url)
         query_params = parse_qs(parsed.query)
         
-        # Ensure sslmode is set for production
-        if self.ENVIRONMENT == "production" and 'sslmode' not in query_params:
-            query_params['sslmode'] = ['require']
+        # For asyncpg, we need to use 'ssl' parameter instead of 'sslmode'
+        if 'sslmode' in query_params:
+            ssl_value = query_params.pop('sslmode')[0]
+            if ssl_value == 'require':
+                query_params['ssl'] = ['require']
+        
+        # Ensure SSL is set for production
+        if self.ENVIRONMENT == "production" and 'ssl' not in query_params:
+            query_params['ssl'] = ['require']
         
         # Rebuild the URL with filtered parameters
         filtered_query = '&'.join(
