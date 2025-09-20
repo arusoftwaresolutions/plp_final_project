@@ -185,6 +185,9 @@ AsyncSessionLocal = async_sessionmaker(
     autoflush=False,
 )
 
+# Base class for models
+Base = declarative_base()
+
 # Dependency for DB session
 async def get_db() -> AsyncGenerator[AsyncSession, None]:
     """Get database session with automatic cleanup."""
@@ -198,21 +201,6 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
         raise
     finally:
         await session.close()
-
-# Base class for models
-Base = declarative_base()
-
-# Dependency for DB session
-async def get_db() -> AsyncGenerator[AsyncSession, None]:
-    async with AsyncSessionLocal() as session:
-        try:
-            yield session
-            await session.commit()
-        except Exception as e:
-            await session.rollback()
-            raise e
-        finally:
-            await session.close()
 
 # Import models to register them with SQLAlchemy
 from .models import *  # noqa

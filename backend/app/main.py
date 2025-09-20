@@ -262,91 +262,143 @@ async def init_db():
             logger.info("✅ Verified/Created roles: admin, user, donor")
 
             # --- USERS ---
-            # Create admin user with properly hashed password
-            admin_password = settings.FIRST_SUPERUSER_PASSWORD or "admin123"
-            admin_user = User(
-                username=settings.FIRST_SUPERUSER or "admin",
-                email=settings.FIRST_SUPERUSER_EMAIL or "admin@example.com",
-                hashed_password=pwd_context.hash(admin_password),
-                full_name="Admin User",
-                is_verified=True,
-                is_active=True,
-                roles=[admin_role, user_role, donor_role]
-            )
-            logger.info(f"Created admin user with email: {admin_user.email}")
-            user1 = User(
-                username="john_doe",
-                email="john@example.com",
-                hashed_password=pwd_context.hash("password123"),
-                full_name="John Doe",
-                is_verified=True,
-                is_active=True,
-                roles=[user_role]
-            )
-            user2 = User(
-                username="jane_smith",
-                email="jane@example.com",
-                hashed_password=pwd_context.hash("password123"),
-                full_name="Jane Smith",
-                is_verified=True,
-                is_active=True,
-                roles=[user_role, donor_role]
-            )
-            # No need to create TransactionCategory instances as they are enums
-            # The TransactionCategory enum is already defined in models.py
-            # We'll use the enum values directly when creating transactions
-            pass
+            users_to_create = []
             
-            # LoanStatus and NotificationType are enums, no need to create them
-            # They are already defined in models.py and can be used directly
+            # Check and create admin user if not exists
+            admin_email = settings.FIRST_SUPERUSER_EMAIL or "admin@example.com"
+            admin_username = settings.FIRST_SUPERUSER or "admin"
+            existing_admin = (await db.execute(select(User).where(User.email == admin_email))).scalars().first()
             
-            # NotificationType is an enum, no need to create it
-            # It's already defined in models.py and can be used directly
+            if not existing_admin:
+                admin_password = settings.FIRST_SUPERUSER_PASSWORD or "admin123"
+                admin_user = User(
+                    username=admin_username,
+                    email=admin_email,
+                    hashed_password=pwd_context.hash(admin_password),
+                    full_name="Admin User",
+                    is_verified=True,
+                    is_active=True,
+                    roles=[admin_role, user_role, donor_role]
+                )
+                users_to_create.append(admin_user)
+                logger.info(f"Creating admin user with email: {admin_email}")
+            else:
+                admin_user = existing_admin
+                logger.info(f"Admin user already exists: {admin_email}")
             
-            # Save all users
-            db.add_all([admin_user, user1, user2])
-            await db.commit()
+            # Check and create regular users if they don't exist
+            user1_email = "john@example.com"
+            existing_user1 = (await db.execute(select(User).where(User.email == user1_email))).scalars().first()
             
-            logger.info("✅ Created sample users and configuration data")
+            if not existing_user1:
+                user1 = User(
+                    username="john_doe",
+                    email=user1_email,
+                    hashed_password=pwd_context.hash("password123"),
+                    full_name="John Doe",
+                    is_verified=True,
+                    is_active=True,
+                    roles=[user_role]
+                )
+                users_to_create.append(user1)
+                logger.info(f"Creating user: {user1_email}")
+            else:
+                user1 = existing_user1
+                logger.info(f"User already exists: {user1_email}")
+            
+            user2_email = "jane@example.com"
+            existing_user2 = (await db.execute(select(User).where(User.email == user2_email))).scalars().first()
+            
+            if not existing_user2:
+                user2 = User(
+                    username="jane_smith",
+                    email=user2_email,
+                    hashed_password=pwd_context.hash("password123"),
+                    full_name="Jane Smith",
+                    is_verified=True,
+                    is_active=True,
+                    roles=[user_role, donor_role]
+                )
+                users_to_create.append(user2)
+                logger.info(f"Creating user: {user2_email}")
+            else:
+                user2 = existing_user2
+                logger.info(f"User already exists: {user2_email}")
+            
+            # Only add users that don't exist yet
+            if users_to_create:
+                db.add_all(users_to_create)
+                await db.commit()
+                logger.info(f"✅ Created {len(users_to_create)} new users")
+            else:
+                logger.info("✅ All users already exist in the database")
+            
+            # Ensure we have user objects for the rest of the seeding
+            admin_user = existing_admin or admin_user
+            user1 = existing_user1 or user1
+            user2 = existing_user2 or user2
 
             # --- TRANSACTIONS ---
             today = datetime.utcnow()
-            transactions = [
-                Transaction(
-                    user=admin_user,
-                    amount=1500.00,
-                    transaction_type=TransactionType.INCOME,
-                    category=TransactionCategory.SALARY.value,
-                    description="Monthly salary",
-                    date=today - timedelta(days=5)
-                ),
-                Transaction(
-                    user=user1,
-                    amount=1200.00,
-                    transaction_type=TransactionType.INCOME,
-                    category=TransactionCategory.SALARY.value,
-                    description="Monthly salary",
-                    date=today - timedelta(days=10)
-                ),
-                Transaction(
-                    user=user1,
-                    amount=150.00,
-                    transaction_type=TransactionType.EXPENSE,
-                    category=TransactionCategory.FOOD.value,
-                    description="Weekly groceries",
-                    date=today - timedelta(days=2)
-                ),
-                Transaction(
-                    user=user2,
-                    amount=200.00,
-                    transaction_type=TransactionType.SAVINGS,
-                    category=TransactionCategory.EMERGENCY_FUND.value,
-                    description="Monthly savings",
-                    date=today - timedelta(days=15)
-                )
+            transactions_to_create = []
+            
+            # Check and create transactions if they don't exist
+            transaction_data = [
+                {
+                    "user": admin_user,
+                    "amount": 1500.00,
+                    "transaction_type": TransactionType.INCOME,
+                    "category": TransactionCategory.SALARY.value,
+                    "description": "Monthly salary",
+                    "date": today - timedelta(days=5)
+                },
+                {
+                    "user": user1,
+                    "amount": 1200.00,
+                    "transaction_type": TransactionType.INCOME,
+                    "category": TransactionCategory.SALARY.value,
+                    "description": "Monthly salary",
+                    "date": today - timedelta(days=10)
+                },
+                {
+                    "user": user1,
+                    "amount": 150.00,
+                    "transaction_type": TransactionType.EXPENSE,
+                    "category": TransactionCategory.FOOD.value,
+                    "description": "Weekly groceries",
+                    "date": today - timedelta(days=2)
+                },
+                {
+                    "user": user2,
+                    "amount": 200.00,
+                    "transaction_type": TransactionType.SAVINGS,
+                    "category": TransactionCategory.EMERGENCY_FUND.value,
+                    "description": "Monthly savings",
+                    "date": today - timedelta(days=15)
+                }
             ]
-            db.add_all(transactions)
-            await db.commit()
+            
+            for tx_data in transaction_data:
+                # Check if a similar transaction already exists
+                exists = await db.execute(
+                    select(Transaction).where(
+                        Transaction.user_id == tx_data["user"].id,
+                        Transaction.amount == tx_data["amount"],
+                        Transaction.transaction_type == tx_data["transaction_type"],
+                        Transaction.description == tx_data["description"],
+                        Transaction.date == tx_data["date"]
+                    )
+                )
+                
+                if not exists.scalars().first():
+                    transactions_to_create.append(Transaction(**tx_data))
+            
+            if transactions_to_create:
+                db.add_all(transactions_to_create)
+                await db.commit()
+                logger.info(f"✅ Created {len(transactions_to_create)} new transactions")
+            else:
+                logger.info("✅ All transactions already exist in the database")
 
             # --- MICROLOANS ---
             loan1 = MicroLoan(

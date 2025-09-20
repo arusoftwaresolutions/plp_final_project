@@ -72,11 +72,14 @@ async def get_current_user(
         token: JWT token
         
     Returns:
-        User: The current user
+        User: The current user with roles loaded
         
     Raises:
         HTTPException: If the token is invalid or the user doesn't exist
     """
+    from sqlalchemy.orm import selectinload
+    from sqlalchemy import select
+    
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
@@ -92,15 +95,32 @@ async def get_current_user(
         user_id: str = payload.get("sub")
         if user_id is None:
             raise credentials_exception
-    except JWTError:
-        raise credentials_exception
+    except JWTError as e:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=f"Invalid token: {str(e)}",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
     
-    # Get user from database
-    user = await db.get(User, int(user_id))
-    if user is None:
-        raise credentials_exception
-    
-    return user
+    # Get user from database with roles loaded
+    try:
+        result = await db.execute(
+            select(User)
+            .where(User.id == int(user_id))
+            .options(selectinload(User.roles))
+        )
+        user = result.scalars().first()
+        
+        if user is None:
+            raise credentials_exception
+            
+        return user
+        
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error fetching user: {str(e)}"
+        )
 
 async def get_current_active_user(
     current_user: User = Depends(get_current_user),
