@@ -82,25 +82,36 @@ async def login_user(email: str, password: str):
     try:
         with st.spinner("Signing in..."):
             # First, get the access token
-            token_data = {
-                "username": email,
+            # Create form data with the correct format for OAuth2
+            form_data = {
+                "username": email,  # Backend expects 'username' but we'll send the email here
                 "password": password,
                 "grant_type": "password"
             }
             
-            # Make the login request
-            token_response = await api_request(
-                "POST",
-                "/auth/login/access-token",
-                data=token_data,
-                form_data=True,
-                retry_on_auth_failure=False  # Don't retry on auth failure for login
-            )
+            st.write("Sending login request...")  # Debugging
             
-            st.write("Login response:", token_response)  # Debugging line
-            
-            if not token_response or 'access_token' not in token_response:
-                st.error("❌ Invalid email or password")
+            # Make the login request with form data
+            try:
+                token_response = await api_request(
+                    "POST",
+                    "/auth/login/access-token",
+                    data=form_data,
+                    form_data=True,  # This will set Content-Type: application/x-www-form-urlencoded
+                    retry_on_auth_failure=False  # Don't retry on auth failure for login
+                )
+                
+                st.write("Login response:", token_response)  # Debugging line
+                
+                if not token_response or 'access_token' not in token_response:
+                    st.error("❌ Invalid email or password")
+                    if token_response and 'detail' in token_response:
+                        st.error(f"Error: {token_response['detail']}")
+                    return
+                    
+            except Exception as e:
+                st.error(f"❌ Login failed: {str(e)}")
+                st.exception(e)  # Print full traceback for debugging
                 return
                 
             # Store the tokens and basic user info
