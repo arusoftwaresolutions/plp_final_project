@@ -35,8 +35,9 @@ def show_login_page():
                 if not email or not password:
                     st.error("Please fill in all fields")
                 else:
-                    import asyncio
-                    asyncio.run(login_user(email, password))
+                    # Store the login attempt in session state and trigger a rerun
+                    st.session_state.login_attempt = {"email": email, "password": password}
+                    st.rerun()
     
     with tab2:
         with st.form("register_form"):
@@ -179,4 +180,11 @@ def get_auth_headers() -> Dict[str, str]:
 
 async def show():
     """Show the login page."""
+    # Check for pending login attempt
+    if "login_attempt" in st.session_state:
+        login_attempt = st.session_state.pop("login_attempt", None)
+        if login_attempt:
+            await login_user(login_attempt["email"], login_attempt["password"])
+    
+    # Show the login page
     show_login_page()
