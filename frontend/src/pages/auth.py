@@ -5,6 +5,7 @@ from typing import Optional, Dict, Any
 
 from utils import (
     API_BASE_URL,
+    FULL_API_URL,  # Add this line
     api_request,
     format_date,
     handle_api_error
@@ -90,16 +91,42 @@ async def login_user(email: str, password: str):
             }
             
             st.write("Sending login request...")  # Debugging
+            st.write("Form data:", form_data)  # Debugging
             
             # Make the login request with form data
             try:
-                token_response = await api_request(
-                    "POST",
-                    "/auth/login/access-token",
-                    data=form_data,
-                    form_data=True,  # This will set Content-Type: application/x-www-form-urlencoded
-                    retry_on_auth_failure=False  # Don't retry on auth failure for login
+                # Make the request directly with requests to have more control
+                import requests
+                from urllib.parse import urlencode
+                
+                # Prepare the request
+                url = f"{FULL_API_URL}/auth/login/access-token"
+                headers = {
+                    "Content-Type": "application/x-www-form-urlencoded",
+                    "accept": "application/json"
+                }
+                
+                st.write(f"Sending POST to: {url}")  # Debugging
+                st.write(f"Headers: {headers}")  # Debugging
+                
+                # Make the request
+                response = requests.post(
+                    url,
+                    data=urlencode(form_data),
+                    headers=headers,
+                    timeout=30
                 )
+                
+                st.write(f"Response status: {response.status_code}")  # Debugging
+                st.write(f"Response headers: {response.headers}")  # Debugging
+                
+                # Parse the response
+                try:
+                    token_response = response.json()
+                    st.write("Response JSON:", token_response)  # Debugging
+                except ValueError:
+                    st.write(f"Non-JSON response: {response.text}")  # Debugging
+                    token_response = None
                 
                 st.write("Login response:", token_response)  # Debugging line
                 

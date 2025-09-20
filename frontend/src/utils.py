@@ -58,10 +58,8 @@ async def api_request(
     
     headers = get_auth_headers()
     
-    if form_data:
-        headers.pop("Content-Type", None)  # Let requests set the correct content-type for form data
-    
     try:
+        # Prepare request kwargs
         kwargs = {
             "headers": headers,
             "params": params or {},
@@ -69,10 +67,16 @@ async def api_request(
             "verify": True  # Enable SSL verification
         }
         
+        # Handle request data
         if data is not None:
             if form_data:
-                kwargs["data"] = data
+                # For form data, ensure we're sending as x-www-form-urlencoded
+                headers["Content-Type"] = "application/x-www-form-urlencoded"
+                # Convert dict to form-urlencoded format
+                from urllib.parse import urlencode
+                kwargs["data"] = urlencode(data)
             else:
+                # For JSON data
                 kwargs["json"] = data
         
         method = method.upper()
