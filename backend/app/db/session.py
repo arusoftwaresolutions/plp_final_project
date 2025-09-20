@@ -27,17 +27,21 @@ async def wait_for_db(db_url: str, max_retries: int = 10, delay: int = 5) -> boo
     parsed = urlparse(db_url)
     query_params = parse_qs(parsed.query)
     
-    # Configure SSL for the connection if needed
-    connect_args = {
-        "connect_timeout": 10
-    }
+    # Configure SSL and connection parameters
+    connect_args = {}
     
     # Only configure SSL if explicitly requested or using Render
-    if 'ssl=require' in db_url.lower() or 'render.com' in db_url:
+    if 'ssl=require' in db_url.lower() or 'render.com' in db_url or 'amazonaws.com' in db_url:
         ssl_context = ssl.create_default_context()
         ssl_context.check_hostname = False
         ssl_context.verify_mode = ssl.CERT_NONE
         connect_args["ssl"] = ssl_context
+    
+    # Set connection timeout through server_settings
+    connect_args["server_settings"] = {
+        "application_name": "poverty_alleviation_platform",
+        "statement_timeout": "30000"  # 30 seconds
+    }
     
     for attempt in range(max_retries):
         try:
@@ -59,13 +63,31 @@ async def wait_for_db(db_url: str, max_retries: int = 10, delay: int = 5) -> boo
             return True
             
         except Exception as e:
+            error_msg = str(e).split('\n')[0]  # Get first line of error message
             if attempt == max_retries - 1:
                 logger.error(f"❌ Failed to connect to database after {max_retries} attempts")
-                logger.error(f"Last error: {str(e)}")
+                logger.error(f"Last error: {error_msg}")
+                # Log full error details in debug mode
+                logger.debug(f"Full error details: {str(e)}")
+                # Log the connection details (with redacted password)
+                parsed = urlparse(db_url)
+                if parsed.password:
+                    redacted_url = db_url.replace(f":{parsed.password}@", ":*****@")
+                    logger.debug(f"Connection URL: {redacted_url}")
                 return False
                 
             logger.warning(f"⚠️ Database not ready, retrying in {delay} seconds... (Attempt {attempt + 1}/{max_retries})")
-            logger.debug(f"Connection error: {str(e)}")
+            logger.debug(f"Connection error: {error_msg}")
+            
+            # Add more detailed logging for common issues
+            if "connection refused" in str(e).lower():
+                logger.debug("  - Check if the database server is running and accessible")
+                logger.debug(f"  - Host: {parsed.hostname}, Port: {parsed.port or 5432}")
+            elif "password authentication failed" in str(e).lower():
+                logger.debug("  - Check if the database credentials are correct")
+            elif "does not exist" in str(e).lower():
+                logger.debug("  - Check if the database exists and the user has access")
+                
             await asyncio.sleep(delay)
     
     return False
@@ -79,6 +101,40 @@ def create_db_engine():
         from urllib.parse import urlparse, parse_qs, urlunparse
         parsed = urlparse(db_url)
         
+        # Configure SSL and connection parameters
+        connect_args = {}
+        
+        # Handle SSL for PostgreSQL on Render or AWS
+        is_production = settings.ENVIRONMENT == "production"
+        is_cloud_db = any(x in db_url.lower() for x in ['render.com', 'amazonaws.com', 'ssl=require'])
+        
+        if is_cloud_db or is_production:
+            import ssl
+            ssl_context = ssl.create_default_context()
+            ssl_context.check_hostname = False
+            ssl_context.verify_mode = ssl.CERT_NONE
+            connect_args['ssl'] = ssl_context
+            
+            # Clean up the URL by removing ssl parameters from the query string
+            query = parse_qs(parsed.query)
+            for ssl_param in ['ssl', 'sslmode']:
+                if ssl_param in query:
+                    query.pop(ssl_param)
+            
+            # Rebuild the URL with updated query parameters
+            filtered_query = '&'.join(f"{k}={v[0]}" for k, v in query.items())
+            parsed = parsed._replace(query=filtered_query)
+            db_url = urlunparse(parsed)
+            
+        # Configure connection pool settings
+        pool_settings = {
+            'pool_pre_ping': True,  # Verify connections before using them
+            'pool_recycle': 300,    # Recycle connections after 5 minutes
+            'pool_size': 5,         # Number of connections to keep open
+            'max_overflow': 10,     # Max number of connections to create beyond pool_size
+            'pool_timeout': 30,     # Max seconds to wait for a connection
+        }
+        
         # Redact password in logs
         if parsed.password:
             redacted_netloc = f"{parsed.username}:*****@{parsed.hostname}"
@@ -87,39 +143,23 @@ def create_db_engine():
             logger.info(f"Connecting to database: {parsed.scheme}://{redacted_netloc}{parsed.path}")
         else:
             logger.info(f"Connecting to database: {db_url}")
-
-        # Handle SSL for Render PostgreSQL - use ssl=require for asyncpg
-        connect_args = {}
-        if 'render.com' in db_url or 'ssl=require' in db_url.lower():
-            import ssl
-            ssl_context = ssl.create_default_context()
-            ssl_context.check_hostname = False
-            ssl_context.verify_mode = ssl.CERT_NONE
-            connect_args['ssl'] = ssl_context
             
-            # Ensure the URL has the correct SSL parameters for asyncpg
-            query = parse_qs(parsed.query)
-            if 'sslmode' in query:
-                # Convert sslmode=require to ssl=require for asyncpg
-                if query['sslmode'][0] == 'require':
-                    query['ssl'] = ['require']
-                del query['sslmode']
-            
-            # Rebuild the URL with updated query parameters
-            filtered_query = '&'.join(f"{k}={v[0]}" for k, v in query.items())
-            parsed = parsed._replace(query=filtered_query)
-            db_url = urlunparse(parsed)
+        # Configure server settings for better monitoring and performance
+        connect_args["server_settings"] = {
+            "application_name": "poverty_alleviation_platform",
+            "statement_timeout": "30000",  # 30 seconds
+            "idle_in_transaction_session_timeout": "60000"  # 60 seconds
+        }
         
-        # Configure connection pool and timeouts
         engine = create_async_engine(
             db_url,
-            echo=settings.DEBUG,
+            connect_args=connect_args,
             pool_pre_ping=True,  # Verify connections before using them
             pool_recycle=300,    # Recycle connections after 5 minutes
             pool_size=5,         # Number of connections to keep open
             max_overflow=10,     # Max number of connections to create beyond pool_size
             pool_timeout=30,     # Max seconds to wait for a connection
-            connect_args=connect_args,
+            echo=settings.DEBUG,
             # Add execution options for better debugging
             execution_options={
                 "isolation_level": "AUTOCOMMIT"

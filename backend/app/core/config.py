@@ -48,51 +48,53 @@ class Settings(BaseSettings):
         db_port = os.getenv("PGPORT", "5432")
         db_user = os.getenv("PGUSER")
         db_password = os.getenv("PGPASSWORD")
-        db_name = os.getenv("PGDATABASE")
+        db_name = os.getenv("PGDATABASE", "poverty_alleviation")
         
-        if all([db_host, db_user, db_password, db_name]):
-            # Use asyncpg driver for async operations with Render
-            # Note: asyncpg uses 'ssl=require' not 'sslmode=require'
-            DATABASE_URL = f"postgresql+asyncpg://{db_user}:{db_password}@{db_host}:{db_port}/{db_name}?ssl=require"
+        if all([db_host, db_user, db_password]):
+            # Use asyncpg driver for async operations with SSL
+            DATABASE_URL = f"postgresql+asyncpg://{db_user}:{db_password}@{db_host}:{db_port}/{db_name}"
+            # Add ssl=require if using Render or AWS
+            if 'render.com' in db_host or 'amazonaws.com' in db_host:
+                DATABASE_URL += "?ssl=require"
         else:
             # Fallback to local development database
-            DATABASE_URL = "postgresql+asyncpg://postgres:postgres@localhost:5432/sdg"
+            DATABASE_URL = "postgresql+asyncpg://postgres:postgres@localhost:5432/poverty_alleviation"
+    
+    # Ensure the DATABASE_URL uses asyncpg and has proper SSL settings
+    if DATABASE_URL.startswith("postgresql://") and "+asyncpg" not in DATABASE_URL:
+        DATABASE_URL = DATABASE_URL.replace("postgresql://", "postgresql+asyncpg://", 1)
 
     @property
     def DATABASE(self) -> str:
-        """Return the asyncpg-compatible database URL."""
+        """Return the asyncpg-compatible database URL with proper SSL settings."""
         db_url = self.DATABASE_URL
         
-        # Normalize the URL if needed
+        # Parse the URL to handle SSL settings properly
+        from urllib.parse import urlparse, urlunparse, parse_qs, urlencode
+        parsed = urlparse(db_url)
+        query = parse_qs(parsed.query)
+        
+        # Remove any existing ssl/sslmode parameters as we'll handle them in connect_args
+        for key in ['ssl', 'sslmode']:
+            if key in query:
+                del query[key]
+        
+        # Add SSL for production environments if needed
+        if self.ENVIRONMENT == "production" and 'render.com' in db_url:
+            query['ssl'] = ['require']
+        
+        # Rebuild the URL with cleaned query parameters
+        clean_query = urlencode(query, doseq=True) if query else ""
+        db_url = urlunparse(parsed._replace(query=clean_query))
+        
+        # Ensure we're using the asyncpg driver
         if db_url.startswith("postgres://"):
             db_url = db_url.replace("postgres://", "postgresql+asyncpg://", 1)
-        elif not db_url.startswith("postgresql+asyncpg://"):
+        elif db_url.startswith("postgresql://") and "+asyncpg" not in db_url:
             db_url = db_url.replace("postgresql://", "postgresql+asyncpg://", 1)
         
-        # Parse the URL to handle query parameters properly
-        from urllib.parse import urlparse, parse_qs, urlunparse
-        
+        # Log the database URL (with redacted password)
         parsed = urlparse(db_url)
-        query_params = parse_qs(parsed.query)
-        
-        # For asyncpg, we need to use 'ssl' parameter instead of 'sslmode'
-        if 'sslmode' in query_params:
-            ssl_value = query_params.pop('sslmode')[0]
-            if ssl_value == 'require':
-                query_params['ssl'] = ['require']
-        
-        # Ensure SSL is set for production
-        if self.ENVIRONMENT == "production" and 'ssl' not in query_params:
-            query_params['ssl'] = ['require']
-        
-        # Rebuild the URL with filtered parameters
-        filtered_query = '&'.join(
-            f"{k}={v[0]}" for k, v in query_params.items()
-        ) if query_params else ''
-        
-        db_url = urlunparse(parsed._replace(query=filtered_query))
-        
-        # Redact password in logs
         if parsed.password:
             redacted_netloc = f"{parsed.username}:*****@{parsed.hostname}"
             if parsed.port:
@@ -100,7 +102,7 @@ class Settings(BaseSettings):
             print(f"[Config] Using database: {parsed.scheme}://{redacted_netloc}{parsed.path}", flush=True)
         else:
             print(f"[Config] Using database: {db_url}", flush=True)
-        
+            
         return db_url
 
     @property
