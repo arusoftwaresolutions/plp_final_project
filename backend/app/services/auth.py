@@ -19,6 +19,42 @@ class AuthService:
     """
     
     @classmethod
+    async def authenticate(
+        cls, 
+        db: AsyncSession, 
+        email: str, 
+        password: str
+    ) -> Optional[User]:
+        """
+        Authenticate a user with email and password.
+        
+        Args:
+            db: Database session
+            email: User's email
+            password: Plain text password
+            
+        Returns:
+            User object if authentication is successful, None otherwise
+        """
+        from backend.app.services.user import user as user_service
+        from backend.app.core.security import verify_password
+        
+        # Get user by email
+        user = await user_service.get_by_email(db, email=email)
+        if not user:
+            return None
+            
+        # Verify password
+        if not verify_password(password, user.hashed_password):
+            return None
+            
+        # Check if user is active
+        if not user.is_active:
+            return None
+            
+        return user
+    
+    @classmethod
     def create_access_token(
         cls, 
         subject: Union[str, Any], 
