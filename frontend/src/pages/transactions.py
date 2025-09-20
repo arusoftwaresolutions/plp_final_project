@@ -1,112 +1,63 @@
-import streamlit as st
+import calendar
+from datetime import datetime, timedelta
+
 import pandas as pd
 import plotly.express as px
-from datetime import datetime, timedelta
-from ..services import api
+import streamlit as st
+
+from utils import get_auth_headers, format_currency, format_date, API_BASE_URL
+
+def get_transactions():
+    """Fetch transactions from the backend."""
+    # In a real app, this would call your backend API
+    # For now, we'll use mock data
+    transactions = [
+        {"id": 1, "date": "2023-06-15", "description": "Grocery Store", "amount": -85.50, "category": "Food"},
+        {"id": 2, "date": "2023-06-14", "description": "Freelance Work", "amount": 350.00, "category": "Income"},
+        {"id": 3, "date": "2023-06-10", "description": "Electric Bill", "amount": -65.75, "category": "Utilities"},
+        {"id": 4, "date": "2023-06-08", "description": "Coffee Shop", "amount": -4.50, "category": "Food"},
+        {"id": 5, "date": "2023-06-05", "description": "Part-time Job", "amount": 200.00, "category": "Income"},
+        {"id": 6, "date": "2023-06-01", "description": "Rent", "amount": -400.00, "category": "Housing"},
+        {"id": 7, "date": "2023-05-28", "description": "Supermarket", "amount": -120.30, "category": "Food"},
+        {"id": 8, "date": "2023-05-25", "description": "Freelance Project", "amount": 500.00, "category": "Income"},
+    ]
+    return pd.DataFrame(transactions)
 
 def show():
-    """Display the transactions page."""
+    """Show the transactions page."""
     st.title("Transactions")
     
-    # Tabs for different views
-    tab1, tab2 = st.tabs(["Transaction History", "Spending Analysis"])
+    # Add tabs for different views
+    tab1, tab2 = st.tabs(["All Transactions", "Add Transaction"])
     
     with tab1:
-        show_transaction_history()
-    
-    with tab2:
-        show_spending_analysis()
-
-def show_transaction_history():
-    """Display transaction history with filtering options."""
-    try:
         # Date range filter
         col1, col2 = st.columns(2)
         with col1:
-            start_date = st.date_input("Start Date", datetime.now() - timedelta(days=30))
+            start_date = st.date_input("Start Date", value=datetime.now() - timedelta(days=30))
         with col2:
-            end_date = st.date_input("End Date", datetime.now())
+            end_date = st.date_input("End Date", value=datetime.now())
         
         # Category filter
-        categories = ["All", "Food", "Transportation", "Housing", "Entertainment", "Utilities", "Other"]
-        selected_category = st.selectbox("Category", categories)
+        all_categories = ["All"] + ["Food", "Income", "Utilities", "Housing", "Transportation", "Healthcare", "Entertainment"]
+        selected_category = st.selectbox("Category", all_categories)
         
-        # Search box
-        search_query = st.text_input("Search transactions")
+        # Get and filter transactions
+        transactions_df = get_transactions()
+        transactions_df['date'] = pd.to_datetime(transactions_df['date'])
         
-        # In a real app, this would fetch from the API with filters
-        # transactions = api.get_transactions(
-        #     start_date=start_date,
-        #     end_date=end_date,
-        #     category=selected_category if selected_category != "All" else None,
-        #     search=search_query if search_query else None
-        # )
+        # Apply filters
+        mask = (transactions_df['date'].dt.date >= start_date) & \
+               (transactions_df['date'].dt.date <= end_date)
         
-        # Mock data for demonstration
-        transactions = [
-            {
-                'id': 1,
-                'date': '2023-10-15',
-                'description': 'Grocery Store',
-                'amount': -125.50,
-                'category': 'Food',
-                'type': 'expense'
-            },
-            {
-                'id': 2,
-                'date': '2023-10-14',
-                'description': 'Salary Deposit',
-                'amount': 2500.00,
-                'category': 'Income',
-                'type': 'income'
-            },
-            {
-                'id': 3,
-                'date': '2023-10-12',
-                'description': 'Electric Bill',
-                'amount': -85.75,
-                'category': 'Utilities',
-                'type': 'expense'
-            },
-            {
-                'id': 4,
-                'date': '2023-10-10',
-                'description': 'Gas Station',
-                'amount': -45.30,
-                'category': 'Transportation',
-                'type': 'expense'
-            },
-            {
-                'id': 5,
-                'date': '2023-10-05',
-                'description': 'Freelance Work',
-                'amount': 500.00,
-                'category': 'Income',
-                'type': 'income'
-            }
-        ]
-        
-        if not transactions:
-            st.info("No transactions found for the selected filters.")
-            return
-        
-        # Convert to DataFrame for display
-        df = pd.DataFrame(transactions)
-        
-        # Apply filters to mock data
         if selected_category != "All":
-            df = df[df['category'] == selected_category]
+            mask = mask & (transactions_df['category'] == selected_category)
         
-        if search_query:
-            mask = df['description'].str.contains(search_query, case=False, na=False)
-            df = df[mask]
+        filtered_df = transactions_df[mask].sort_values('date', ascending=False)
         
-        # Display transactions in a data table
-        st.subheader("Transaction History")
-        
-        # Summary cards
-        total_income = df[df['type'] == 'income']['amount'].sum()
-        total_expenses = abs(df[df['type'] == 'expense']['amount'].sum())
+        # Display summary metrics
+        total_income = filtered_df[filtered_df['amount'] > 0]['amount'].sum()
+        total_expenses = abs(filtered_df[filtered_df['amount'] < 0]['amount'].sum())
         
         col1, col2 = st.columns(2)
         with col1:
@@ -114,149 +65,204 @@ def show_transaction_history():
         with col2:
             st.metric("Total Expenses", f"${total_expenses:,.2f}")
         
-        # Transactions table
-        st.dataframe(
-            df[['date', 'description', 'amount', 'category']],
-            column_config={
-                'date': 'Date',
-                'description': 'Description',
-                'amount': st.column_config.NumberColumn(
-                    'Amount',
-                    format='$%.2f',
-                    help="Negative amounts are expenses, positive are income"
-                ),
-                'category': 'Category'
-            },
-            hide_index=True,
-            use_container_width=True
+        # Display transactions in a table
+        st.subheader("Transaction History")
+        
+        # Format the table with custom styling
+        def format_amount(amount):
+            color = "green" if amount > 0 else "red"
+            return f'<span style="color: {color}">{amount:+,.2f}</span>'
+        
+        # Display styled DataFrame
+        st.markdown(
+            filtered_df.style.format({
+                'amount': format_amount,
+                'date': lambda x: x.strftime('%b %d, %Y')
+            }).hide(axis="index").to_html(), 
+            unsafe_allow_html=True
         )
         
-        # Export button
-        if st.button("Export to CSV"):
-            csv = df.to_csv(index=False)
-            st.download_button(
-                label="Download CSV",
-                data=csv,
-                file_name=f"transactions_{datetime.now().strftime('%Y%m%d')}.csv",
-                mime="text/csv"
-            )
-    
-    except Exception as e:
-        st.error(f"Error loading transactions: {str(e)}")
-
-def show_spending_analysis():
-    """Display spending analysis with charts."""
-    try:
-        # Date range filter
-        st.subheader("Spending Analysis")
+        # Add some space
+        st.write("")
         
-        # Time period selection
-        time_period = st.selectbox(
-            "Time Period",
-            ["Last 7 Days", "Last 30 Days", "Last 3 Months", "Last 6 Months", "This Year"],
-            index=1
-        )
+        # Monthly trends chart
+        st.subheader("Monthly Trends")
         
-        # In a real app, this would fetch from the API
-        # transactions = api.get_transactions(time_period=time_period)
+        # Prepare data for the chart
+        monthly_data = transactions_df.copy()
+        monthly_data['month'] = monthly_data['date'].dt.to_period('M')
+        monthly_data['month'] = monthly_data['month'].dt.strftime('%b %Y')
+        monthly_data['is_income'] = monthly_data['amount'] > 0
         
-        # Mock data for demonstration
-        transactions = [
-            {'date': '2023-10-15', 'amount': -125.50, 'category': 'Food'},
-            {'date': '2023-10-14', 'amount': 2500.00, 'category': 'Income'},
-            {'date': '2023-10-12', 'amount': -85.75, 'category': 'Utilities'},
-            {'date': '2023-10-10', 'amount': -45.30, 'category': 'Transportation'},
-            {'date': '2023-10-10', 'amount': -75.20, 'category': 'Food'},
-            {'date': '2023-10-08', 'amount': -120.00, 'category': 'Entertainment'},
-            {'date': '2023-10-05', 'amount': 500.00, 'category': 'Income'},
-            {'date': '2023-10-03', 'amount': -200.00, 'category': 'Housing'},
-            {'date': '2023-10-01', 'amount': -35.50, 'category': 'Transportation'},
-            {'date': '2023-09-28', 'amount': -60.00, 'category': 'Food'},
-            {'date': '2023-09-25', 'amount': -150.00, 'category': 'Shopping'},
-            {'date': '2023-09-20', 'amount': -80.00, 'category': 'Utilities'},
-            {'date': '2023-09-15', 'amount': 2500.00, 'category': 'Income'},
-        ]
-        
-        if not transactions:
-            st.info("No transaction data available for analysis.")
-            return
-        
-        # Convert to DataFrame
-        df = pd.DataFrame(transactions)
-        df['date'] = pd.to_datetime(df['date'])
-        
-        # Filter expenses only for analysis
-        expenses = df[df['amount'] < 0].copy()
-        expenses['amount'] = expenses['amount'].abs()
-        
-        if expenses.empty:
-            st.info("No expense data available for analysis.")
-            return
-        
-        # Spending by category
-        st.subheader("Spending by Category")
-        
-        category_totals = expenses.groupby('category')['amount'].sum().reset_index()
-        
-        # Create a pie chart
-        fig1 = px.pie(
-            category_totals,
+        # Pivot for stacked bar chart
+        pivot_data = monthly_data.pivot_table(
+            index='month',
+            columns='is_income',
             values='amount',
-            names='category',
-            title='Spending Distribution by Category',
-            hole=0.4
+            aggfunc='sum',
+            fill_value=0
+        ).reset_index()
+        
+        # Rename columns for clarity
+        pivot_data.columns = ['Month', 'Expenses', 'Income']
+        pivot_data['Expenses'] = abs(pivot_data['Expenses'])
+        
+        # Create stacked bar chart
+        fig = px.bar(
+            pivot_data.melt(id_vars='Month', var_name='Type', value_name='Amount'),
+            x='Month',
+            y='Amount',
+            color='Type',
+            title='Income vs Expenses by Month',
+            color_discrete_map={
+                'Income': '#10B981',
+                'Expenses': '#EF4444'
+            }
         )
-        st.plotly_chart(fig1, use_container_width=True)
         
-        # Time-based spending
-        st.subheader("Spending Over Time")
-        
-        # Group by date and calculate daily totals
-        daily_spending = expenses.groupby('date')['amount'].sum().reset_index()
-        
-        # Create a line chart
-        fig2 = px.line(
-            daily_spending,
-            x='date',
-            y='amount',
-            title='Daily Spending',
-            labels={'amount': 'Amount ($)', 'date': 'Date'}
+        fig.update_layout(
+            barmode='group',
+            xaxis_title='',
+            yaxis_title='Amount ($)',
+            legend_title='',
+            hovermode='x unified'
         )
-        st.plotly_chart(fig2, use_container_width=True)
         
-        # Category trends over time
-        st.subheader("Category Trends")
-        
-        # Group by date and category
-        category_trends = expenses.groupby(['date', 'category'])['amount'].sum().reset_index()
-        
-        # Create a line chart for each category
-        fig3 = px.line(
-            category_trends,
-            x='date',
-            y='amount',
-            color='category',
-            title='Spending by Category Over Time',
-            labels={'amount': 'Amount ($)', 'date': 'Date', 'category': 'Category'}
-        )
-        st.plotly_chart(fig3, use_container_width=True)
-        
-        # Top expenses
-        st.subheader("Top Expenses")
-        
-        # Sort by amount (descending) and take top 10
-        top_expenses = expenses.nlargest(10, 'amount')
-        
-        # Create a bar chart
-        fig4 = px.bar(
-            top_expenses,
-            x='amount',
-            y='category',
-            orientation='h',
-            title='Top 10 Expenses by Category',
-            labels={'amount': 'Amount ($)', 'category': 'Category'}
-        )
-        st.plotly_chart(fig4, use_container_width=True)
+        st.plotly_chart(fig, use_container_width=True)
     
-    except Exception as e:
-        st.error(f"Error generating spending analysis: {str(e)}")
+    with tab2:
+        # Add transaction form
+        with st.form("add_transaction"):
+            st.subheader("Add New Transaction")
+            
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                transaction_type = st.radio(
+                    "Transaction Type",
+                    ["Expense", "Income"],
+                    horizontal=True
+                )
+                
+                amount = st.number_input(
+                    "Amount",
+                    min_value=0.01,
+                    step=0.01,
+                    format="%.2f"
+                )
+                
+                if transaction_type == "Expense":
+                    amount = -amount
+                
+                date = st.date_input("Date", value=datetime.now())
+            
+            with col2:
+                category = st.selectbox(
+                    "Category",
+                    ["Food", "Housing", "Transportation", "Utilities", 
+                     "Healthcare", "Education", "Entertainment", "Other"]
+                )
+                
+                description = st.text_input("Description")
+                
+                # Add some space
+                st.write("")
+                st.write("")
+                
+                submit_button = st.form_submit_button("Add Transaction")
+            
+            if submit_button:
+                # In a real app, this would save to your backend
+                st.success("✅ Transaction added successfully!")
+                
+                # Show a preview
+                st.subheader("Preview")
+                
+                preview_df = pd.DataFrame([{
+                    "Date": date.strftime('%b %d, %Y'),
+                    "Description": description,
+                    "Category": category,
+                    "Amount": f"{'+' if amount > 0 else ''}{amount:.2f}"
+                }])
+                
+                st.dataframe(
+                    preview_df.style.highlight_between(
+                        subset=['Amount'],
+                        left=0.01,  # Any positive number
+                        right=None,  # No upper bound
+                        props='color:green;',
+                        axis=None
+                    ).highlight_between(
+                        subset=['Amount'],
+                        left=None,  # No lower bound
+                        right=0,    # Any negative number
+                        props='color:red;',
+                        axis=None
+                    ),
+                    hide_index=True
+                )
+                
+                # Reset form
+                st.experimental_rerun()
+    
+    # Add custom styles
+    st.markdown("""
+        <style>
+            /* Style the table */
+            table {
+                width: 100%;
+                border-collapse: collapse;
+                margin: 1rem 0;
+                font-size: 0.9em;
+            }
+            
+            th {
+                background-color: #f8fafc;
+                text-align: left;
+                padding: 0.75rem;
+                border-bottom: 2px solid #e2e8f0;
+                font-weight: 600;
+                color: #475569;
+            }
+            
+            td {
+                padding: 0.75rem;
+                border-bottom: 1px solid #e2e8f0;
+            }
+            
+            tr:hover {
+                background-color: #f8fafc;
+            }
+            
+            /* Style form elements */
+            .stRadio > div {
+                display: flex;
+                gap: 1rem;
+            }
+            
+            .stRadio > div > label {
+                margin: 0;
+                flex: 1;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                padding: 0.5rem;
+                border-radius: 0.5rem;
+                background: #f1f5f9;
+                transition: all 0.2s;
+            }
+            
+            .stRadio > div > label:hover {
+                background: #e2e8f0;
+            }
+            
+            .stRadio > div > div[data-baseweb="radio"] {
+                margin-right: 0.5rem;
+            }
+            
+            .stButton > button {
+                width: 100%;
+                margin-top: 1.5rem;
+            }
+        </style>
+    """, unsafe_allow_html=True)

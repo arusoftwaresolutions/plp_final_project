@@ -1,237 +1,416 @@
-import streamlit as st
-from streamlit_option_menu import option_menu
+import asyncio
 import os
+import sys
+import logging
+import streamlit as st
 from dotenv import load_dotenv
-from pathlib import Path
-from datetime import datetime
+from typing import Dict, Any, Callable, Awaitable, Optional, List, Tuple
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.StreamHandler(sys.stdout)
+    ]
+)
+logger = logging.getLogger(__name__)
+
+# Add the src directory to the path for module imports
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+# Import page modules from the pages package with error handling
+PAGE_MODULES = {}
+try:
+    from pages import (
+        dashboard,
+        ai_recommendations,
+        transactions,
+        crowdfunding,
+        microloans,
+        poverty_map,
+        profile,
+        admin_panel,
+        auth
+    )
+    
+    PAGE_MODULES = {
+        "dashboard": dashboard,
+        "ai_recommendations": ai_recommendations,
+        "transactions": transactions,
+        "crowdfunding": crowdfunding,
+        "microloans": microloans,
+        "poverty_map": poverty_map,
+        "profile": profile,
+        "admin_panel": admin_panel,
+        "auth": auth
+    }
+    
+except ImportError as e:
+    logger.error(f"Failed to import page modules: {e}")
+    st.error("Failed to load application modules. Please check the logs.")
+    st.stop()
 
 # Load environment variables
 load_dotenv()
 
-# Import from config
-from config import settings
+# Type aliases
+PageFunc = Callable[[], Awaitable[None]]
 
 # Set page config
-st.set_page_config(
-    page_title="Poverty Alleviation Platform",
-    page_icon="🌍",
-    layout="wide",
-    initial_sidebar_state="expanded"
-)
+try:
+    st.set_page_config(
+        page_title="Financial Inclusion App",
+        page_icon="💰",
+        layout="wide",
+        initial_sidebar_state="collapsed",
+        menu_items={
+            'Get Help': 'https://github.com/yourusername/financial-inclusion-app',
+            'Report a bug': 'https://github.com/yourusername/financial-inclusion-app/issues',
+            'About': """
+            # Financial Inclusion App
+            
+            Empowering communities through financial services.
+            
+            Version: 1.0.0  
+            Last updated: 2023-11-15
+            """
+        }
+    )
+except Exception as e:
+    logger.error(f"Failed to set page config: {e}")
+    st.error("Failed to initialize the application. Please try refreshing the page.")
+    st.stop()
 
-# Add custom CSS
+# Custom CSS to hide Streamlit elements and add custom styles
 st.markdown("""
     <style>
-    .main {
-        padding: 2rem;
-    }
-    .stButton>button {
-        width: 100%;
-    }
-    .stTextInput>div>div>input {
-        padding: 10px;
-    }
-    /* Custom scrollbar */
-    ::-webkit-scrollbar {
-        width: 8px;
-        height: 8px;
-    }
-    ::-webkit-scrollbar-track {
-        background: #f1f1f1;
-    }
-    ::-webkit-scrollbar-thumb {
-        background: #888;
-        border-radius: 4px;
-    }
-    ::-webkit-scrollbar-thumb:hover {
-        background: #555;
-    }
-    /* Card styling */
-    .card {
-        background: white;
-        border-radius: 10px;
-        padding: 1.5rem;
-        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-        margin-bottom: 1.5rem;
-    }
-    /* Custom tooltip */
-    .tooltip {
-        position: relative;
-        display: inline-block;
-        border-bottom: 1px dotted black;
-    }
-    .tooltip .tooltiptext {
-        visibility: hidden;
-        width: 200px;
-        background-color: #555;
-        color: #fff;
-        text-align: center;
-        border-radius: 6px;
-        padding: 5px;
-        position: absolute;
-        z-index: 1;
-        bottom: 125%;
-        left: 50%;
-        margin-left: -100px;
-        opacity: 0;
-        transition: opacity 0.3s;
-    }
-    .tooltip:hover .tooltiptext {
-        visibility: visible;
-        opacity: 1;
-    }
+        /* Hide Streamlit default elements */
+        #MainMenu {visibility: hidden;}
+        footer {visibility: hidden;}
+        header {visibility: hidden;}
+        
+        /* Custom styles */
+        .main {
+            padding: 1rem 2rem;
+        }
+        
+        .card {
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+        }
+        
+        .navbar {
+            background: #2563eb;
+            color: white;
+            padding: 1rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+            border-radius: 0 0 10px 10px;
+        }
+        
+        .logo {
+            font-size: 1.5rem;
+            font-weight: bold;
+        }
+        
+        .nav-links {
+            display: flex;
+            gap: 1.5rem;
+        }
+        
+        .nav-link {
+            color: white;
+            text-decoration: none;
+            font-weight: 500;
+            padding: 0.5rem 1rem;
+            border-radius: 5px;
+            transition: background 0.3s;
+        }
+        
+        .nav-link:hover {
+            background: rgba(255, 255, 255, 0.1);
+        }
+        
+        .nav-link.active {
+            background: rgba(255, 255, 255, 0.2);
+        }
     </style>
 """, unsafe_allow_html=True)
 
-# Lazy import pages to avoid startup crashes if a page has an import issue
-import importlib
+# Import pages
+from pages import (
+    dashboard,
+    ai_recommendations,
+    transactions,
+    crowdfunding,
+    microloans,
+    poverty_map,
+    profile,
+    admin_panel,
+    auth
+)
 
-def safe_import(module_path: str):
-    try:
-        return importlib.import_module(module_path)
-    except Exception as e:
-        def _fallback_show():
-            st.error(f"Failed to load page '{module_path}'.")
-            st.exception(e)
-        return type("_MissingPage", (), {"show": staticmethod(_fallback_show)})
+# Initialize session state with default values
+def init_session_state():
+    """Initialize the session state with default values."""
+    defaults = {
+        'authenticated': False,
+        'is_admin': False,
+        'current_user': None,
+        'current_page': 'Dashboard',
+        'initialized': True,
+        'show_sidebar': False,
+        'error': None,
+        'success': None,
+        'info': None,
+        'warning': None,
+        'page_title': 'Financial Inclusion App',
+        'page_icon': '💰',
+        'theme': 'light',
+        'language': 'en',
+        'timezone': 'UTC',
+        'last_activity': None,
+        'permissions': {},
+        'settings': {
+            'notifications': True,
+            'analytics': False,
+            'dark_mode': False,
+            'compact_view': False
+        },
+        'navigation': {
+            'previous_pages': [],
+            'can_go_back': False
+        },
+        'data': {}
+    }
+    
+    # Only set defaults if they don't exist
+    for key, value in defaults.items():
+        if key not in st.session_state:
+            st.session_state[key] = value
 
-dashboard = safe_import("pages.dashboard")
-transactions = safe_import("pages.transactions")
-loans = safe_import("pages.loans")
-crowdfunding = safe_import("pages.crowdfunding")
-insights = safe_import("pages.insights")
-admin = safe_import("pages.admin")
-auth = safe_import("pages.auth")
-settings = safe_import("pages.settings")
+# Initialize the session state
+init_session_state()
 
-# App state
-class State:
-    def __init__(self):
-        self.token = None
-        self.user = None
-        self.is_authenticated = False
-        self.is_admin = False
+# Navigation configuration
+PAGES: Dict[str, Dict[str, Any]] = {
+    "Dashboard": {
+        "module": "dashboard",
+        "icon": "📊",
+        "requires_auth": True,
+        "category": "main",
+        "order": 1
+    },
+    "AI Recommendations": {
+        "module": "ai_recommendations",
+        "icon": "🤖",
+        "requires_auth": True,
+        "category": "tools",
+        "order": 2
+    },
+    "Transactions": {
+        "module": "transactions",
+        "icon": "💳",
+        "requires_auth": True,
+        "category": "finance",
+        "order": 3
+    },
+    "Crowdfunding": {
+        "module": "crowdfunding",
+        "icon": "🤝",
+        "requires_auth": True,
+        "category": "community",
+        "order": 4
+    },
+    "Microloans": {
+        "module": "microloans",
+        "icon": "📈",
+        "requires_auth": True,
+        "category": "finance",
+        "order": 5
+    },
+    "Poverty Map": {
+        "module": "poverty_map",
+        "icon": "🗺️",
+        "requires_auth": True,
+        "category": "community",
+        "order": 6
+    },
+    "Profile": {
+        "module": "profile",
+        "icon": "👤",
+        "requires_auth": True,
+        "category": "account",
+        "order": 98
+    },
+    "Admin Panel": {
+        "module": "admin_panel",
+        "icon": "🔒",
+        "requires_auth": True,
+        "requires_admin": True,
+        "category": "admin",
+        "order": 99,
+        "hide_from_nav": False
+    },
+    "Login": {
+        "module": "auth",
+        "icon": "🔑",
+        "requires_auth": False,
+        "hide_from_nav": True,
+        "order": 100
+    }
+}
+
+# Group navigation items by category
+NAV_CATEGORIES = {
+    "main": {"name": "Main", "icon": "🏠"},
+    "finance": {"name": "Finance", "icon": "💰"},
+    "community": {"name": "Community", "icon": "🌍"},
+    "tools": {"name": "Tools", "icon": "🛠️"},
+    "account": {"name": "Account", "icon": "👤"},
+    "admin": {"name": "Administration", "icon": "🔒"}
+}
 
 # Initialize session state
-if 'state' not in st.session_state:
-    st.session_state.state = State()
+if 'authenticated' not in st.session_state:
+    st.session_state.authenticated = False
+    st.session_state.is_admin = False
+    st.session_state.current_user = None
+    st.session_state.current_page = "Dashboard"
 
-# Initialize session variables
-for var in ['show_create_campaign', 'show_organizations', 'show_learn_more', 'eligibility']:
-    if var not in st.session_state:
-        st.session_state[var] = None
-
-# Main app layout
-def main():
-    # Import auth here to avoid circular imports
-    from pages import auth
+def render_navbar():
+    """Render the top navigation bar."""
+    st.markdown("""
+        <div class="navbar">
+            <div class="logo">Financial Inclusion App</div>
+            <div class="nav-links">
+    """, unsafe_allow_html=True)
     
-    # Initialize session state for authentication
-    if not hasattr(st.session_state, 'state'):
-        st.session_state.state = State()
-    
-    # Check if user is authenticated
-    is_authenticated = hasattr(st.session_state.state, 'is_authenticated') and st.session_state.state.is_authenticated
-    
-    # If not authenticated, show login/register page
-    if not is_authenticated:
-        # Hide sidebar completely
-        st.markdown("""
-        <style>
-            section[data-testid="stSidebar"] {
-                display: none !important;
-            }
-            .main .block-container {
-                padding: 0 !important;
-                max-width: 100% !important;
-            }
-            /* Hide the hamburger menu */
-            [data-testid="stToolbar"] {
-                display: none !important;
-            }
-            /* Ensure full width for auth pages */
-            .stApp {
-                max-width: 100% !important;
-                padding: 0 !important;
-            }
-            /* Remove any default padding */
-            .block-container {
-                padding: 0 !important;
-            }
-        </style>
-        """, unsafe_allow_html=True)
-        
-        # Show auth pages
-        auth.show_login_page()
-        return
-    
-    # If authenticated, show the sidebar and main content
-    with st.sidebar:
-        st.image("assets/logo.png", width=200)
-        st.title("Poverty Alleviation")
-        
-        # Show user info
-        if hasattr(st.session_state.state, 'user') and st.session_state.state.user:
-            st.markdown(f"### Welcome, {st.session_state.state.user.get('username', 'User')}")
-        
-        # Navigation menu
-        menu_options = ["Dashboard", "Transactions", "Loans", "Crowdfunding", "Insights", "Settings"]
-        
-        # Add admin menu if user is admin
-        if hasattr(st.session_state.state, 'is_admin') and st.session_state.state.is_admin:
-            menu_options.append("Admin")
-        
-        selected = option_menu(
-            menu_title=None,
-            options=menu_options,
-            icons=["house", "cash-coin", "bank", "people", "graph-up", "gear", "shield-lock"][:len(menu_options)],
-            default_index=0,
-            styles={
-                "container": {"padding": "0!important", "background-color": "#f8f9fa"},
-                "nav-link": {"font-size": "14px", "text-align": "left", "margin": "5px 0", "border-radius": "5px"},
-                "nav-link-selected": {"background-color": "#0d6efd"},
-            }
-        )
-        
-        # Quick actions
-        st.markdown("---")
-        st.markdown("### Quick Actions")
-        
-        if st.button("💳 New Transaction", use_container_width=True):
-            st.session_state.show_new_transaction = True
-            
-        if st.button("📝 Apply for Loan", use_container_width=True):
-            st.session_state.show_loan_application = True
-            
-        if st.button("🎯 Create Campaign", use_container_width=True):
-            st.session_state.show_create_campaign = True
+    # Only show navigation if user is authenticated
+    if st.session_state.authenticated:
+        for page_name in PAGES:
+            # Skip admin panel if not admin
+            if page_name == "Admin Panel" and not st.session_state.is_admin:
+                continue
+                
+            active = "active" if st.session_state.current_page == page_name else ""
+            st.markdown(
+                f'<a href="?page={page_name}" class="nav-link {active}">{page_name}</a>',
+                unsafe_allow_html=True
+            )
         
         # Logout button
-        st.markdown("---")
-        if st.button("🚪 Logout", use_container_width=True, type="primary"):
-            st.session_state.state = State()
+        if st.button("Logout", key="logout_btn"):
+            st.session_state.authenticated = False
+            st.session_state.is_admin = False
+            st.session_state.current_user = None
             st.experimental_rerun()
-        
-        # Footer
-        st.caption(f"v1.0.0 • {datetime.now().year} © Poverty Alleviation Platform")
     
-    # Display selected page
-    if selected == "Dashboard":
-        dashboard.show()
-    elif selected == "Transactions":
-        transactions.show()
-    elif selected == "Loans":
-        loans.show()
-    elif selected == "Crowdfunding":
-        crowdfunding.show()
-    elif selected == "Insights":
-        insights.show()
-    elif selected == "Settings":
-        settings.show()
-    elif selected == "Admin" and st.session_state.state.is_admin:
-        admin.show()
+    st.markdown("""
+            </div>
+        </div>
+    """, unsafe_allow_html=True)
+
+async def render_page(page_name: str) -> None:
+    """Render the specified page."""
+    if page_name not in PAGES:
+        page_name = "Dashboard"
+        st.session_state.current_page = "Dashboard"
+    
+    page_config = PAGES[page_name]
+    
+    # Check authentication
+    if page_config["requires_auth"] and not st.session_state.authenticated:
+        st.warning("Please log in to access this page.")
+        st.session_state.current_page = "Login"
+        st.experimental_rerun()
+        return
+    
+    # Check admin access
+    if page_config.get("requires_admin", False) and not st.session_state.is_admin:
+        st.error("You don't have permission to access this page.")
+        st.session_state.current_page = "Dashboard"
+        st.experimental_rerun()
+        return
+    
+    # Render the page
+    try:
+        await page_config["module"].show()
+    except Exception as e:
+        st.error(f"An error occurred while loading the page: {str(e)}")
+        st.exception(e)  # Log full exception for debugging
+
+async def main():
+    """Main application function."""
+    # Get current page from query params or session state
+    query_params = st.experimental_get_query_params()
+    current_page = query_params.get("page", [st.session_state.current_page])[0]
+    
+    # Update session state
+    st.session_state.current_page = current_page
+    
+    # Render navigation (except for login page)
+    if current_page != "Login" or not st.session_state.authenticated:
+        render_navbar()
+    
+    # Render the current page
+    await render_page(current_page)
+    
+    # Add custom CSS
+    st.markdown("""
+        <style>
+            /* Main content padding */
+            .main .block-container {
+                padding-top: 2rem;
+                padding-bottom: 2rem;
+            }
+            
+            /* Button styling */
+            .stButton > button {
+                border-radius: 0.5rem;
+                padding: 0.5rem 1rem;
+                font-weight: 500;
+                transition: all 0.2s ease;
+            }
+            
+            /* Card styling */
+            .card {
+                background: white;
+                border-radius: 0.5rem;
+                box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+                padding: 1.5rem;
+                margin-bottom: 1.5rem;
+            }
+            
+            /* Form styling */
+            .stTextInput > div > div > input,
+            .stTextArea > div > div > textarea,
+            .stSelectbox > div > div > div,
+            .stNumberInput > div > div > input,
+            .stDateInput > div > div > input {
+                border-radius: 0.375rem;
+                border: 1px solid #d1d5db;
+                padding: 0.5rem 0.75rem;
+            }
+            
+            /* Table styling */
+            .stDataFrame {
+                border-radius: 0.5rem;
+                overflow: hidden;
+            }
+            
+            /* Hide Streamlit branding */
+            #MainMenu {visibility: hidden;}
+            footer {visibility: hidden;}
+            header {visibility: hidden;}
+        </style>
+    """, unsafe_allow_html=True)
 
 if __name__ == "__main__":
-    # Add a loading spinner while the app is initializing
-    with st.spinner('Loading application...'):
-        main()
+    asyncio.run(main())
