@@ -310,7 +310,7 @@ def render_navbar():
             st.session_state.authenticated = False
             st.session_state.is_admin = False
             st.session_state.current_user = None
-            st.experimental_rerun()
+            st.rerun()
     
     st.markdown("""
             </div>
@@ -329,14 +329,14 @@ async def render_page(page_name: str) -> None:
     if page_config["requires_auth"] and not st.session_state.authenticated:
         st.warning("Please log in to access this page.")
         st.session_state.current_page = "Login"
-        st.experimental_rerun()
+        st.rerun()
         return
     
     # Check admin access
     if page_config.get("requires_admin", False) and not st.session_state.is_admin:
         st.error("You don't have permission to access this page.")
         st.session_state.current_page = "Dashboard"
-        st.experimental_rerun()
+        st.rerun()
         return
     
     # Render the page
@@ -349,8 +349,7 @@ async def render_page(page_name: str) -> None:
 async def main():
     """Main application function."""
     # Get current page from query params or session state
-    query_params = st.experimental_get_query_params()
-    current_page = query_params.get("page", [st.session_state.current_page])[0]
+    current_page = st.query_params.get("page", st.session_state.current_page)
     
     # Update session state
     st.session_state.current_page = current_page
