@@ -8,9 +8,6 @@ import json
 import logging
 import os
 import re
-
-# Import API client
-from .api_client import APIClient, api_client
 import uuid
 
 from dateutil import parser

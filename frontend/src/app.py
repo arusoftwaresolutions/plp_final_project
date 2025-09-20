@@ -8,6 +8,9 @@ from datetime import datetime
 # Load environment variables
 load_dotenv()
 
+# Import from config
+from config import settings
+
 # Set page config
 st.set_page_config(
     page_title="Poverty Alleviation Platform",
@@ -16,33 +19,57 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Custom CSS for the app
+# Add custom CSS
 st.markdown("""
-<style>
-.main .block-container {
-    padding-top: 2rem;
-    padding-bottom: 2rem;
-}
-.stButton>button {
-    width: 100%;
-}
-.stTextInput>div>div>input {
-    border-radius: 20px;
-}
-/* Hide the default Streamlit menu */
-#MainMenu {visibility: hidden;}
-header {visibility: hidden;}
-footer {visibility: hidden;}
-/* Style for auth forms */
-.auth-form {
-    max-width: 400px;
-    margin: 0 auto;
-    padding: 2rem;
-    border-radius: 10px;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-    background-color: white;
-}
-</style>
+    <style>
+    .main {
+        padding: 2rem;
+    }
+    .stButton>button {
+        width: 100%;
+    }
+    .stTextInput>div>div>input {
+        padding: 10px;
+    }
+    /* Custom scrollbar */
+    ::-webkit-scrollbar {
+        width: 8px;
+        height: 8px;
+    }
+    ::-webkit-scrollbar-track {
+        background: #f1f1f1;
+    }
+    ::-webkit-scrollbar-thumb {
+        background: #888;
+        border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+        background: #555;
+    }
+    /* Card styling */
+    .card {
+        background: white;
+        border-radius: 10px;
+        padding: 1.5rem;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        margin-bottom: 1.5rem;
+    }
+    /* Custom tooltip */
+    .tooltip {
+        position: relative;
+        display: inline-block;
+        border-bottom: 1px dotted black;
+    }
+    .tooltip .tooltiptext {
+        visibility: hidden;
+        width: 200px;
+        background-color: #555;
+        color: #fff;
+        text-align: center;
+        border-radius: 6px;
+        padding: 5px;
+        position: absolute;
+        z-index: 1;
         bottom: 125%;
         left: 50%;
         margin-left: -100px;
@@ -94,12 +121,51 @@ for var in ['show_create_campaign', 'show_organizations', 'show_learn_more', 'el
     if var not in st.session_state:
         st.session_state[var] = None
 
-# Check authentication state
-is_authenticated = hasattr(st.session_state.state, 'is_authenticated') and st.session_state.state.is_authenticated
-
-# Show sidebar only if user is authenticated
-if is_authenticated:
-    # Navigation menu
+# Main app layout
+def main():
+    # Import auth here to avoid circular imports
+    from pages import auth
+    
+    # Initialize session state for authentication
+    if not hasattr(st.session_state, 'state'):
+        st.session_state.state = State()
+    
+    # Check if user is authenticated
+    is_authenticated = hasattr(st.session_state.state, 'is_authenticated') and st.session_state.state.is_authenticated
+    
+    # If not authenticated, show login/register page
+    if not is_authenticated:
+        # Hide sidebar completely
+        st.markdown("""
+        <style>
+            section[data-testid="stSidebar"] {
+                display: none !important;
+            }
+            .main .block-container {
+                padding: 0 !important;
+                max-width: 100% !important;
+            }
+            /* Hide the hamburger menu */
+            [data-testid="stToolbar"] {
+                display: none !important;
+            }
+            /* Ensure full width for auth pages */
+            .stApp {
+                max-width: 100% !important;
+                padding: 0 !important;
+            }
+            /* Remove any default padding */
+            .block-container {
+                padding: 0 !important;
+            }
+        </style>
+        """, unsafe_allow_html=True)
+        
+        # Show auth pages
+        auth.show_login_page()
+        return
+    
+    # If authenticated, show the sidebar and main content
     with st.sidebar:
         st.image("assets/logo.png", width=200)
         st.title("Poverty Alleviation")
@@ -109,14 +175,7 @@ if is_authenticated:
             st.markdown(f"### Welcome, {st.session_state.state.user.get('username', 'User')}")
         
         # Navigation menu
-        menu_options = [
-            "Dashboard",
-            "Transactions",
-            "Loans",
-            "Crowdfunding",
-            "Insights",
-            "Settings"
-        ]
+        menu_options = ["Dashboard", "Transactions", "Loans", "Crowdfunding", "Insights", "Settings"]
         
         # Add admin menu if user is admin
         if hasattr(st.session_state.state, 'is_admin') and st.session_state.state.is_admin:
@@ -125,9 +184,7 @@ if is_authenticated:
         selected = option_menu(
             menu_title=None,
             options=menu_options,
-            icons=[
-                "house", "cash-coin", "bank", "people", "graph-up", "gear", "shield-lock"
-            ][:len(menu_options)],
+            icons=["house", "cash-coin", "bank", "people", "graph-up", "gear", "shield-lock"][:len(menu_options)],
             default_index=0,
             styles={
                 "container": {"padding": "0!important", "background-color": "#f8f9fa"},
@@ -136,16 +193,10 @@ if is_authenticated:
             }
         )
         
-        # Logout button
-        if st.button("Logout", use_container_width=True, type="primary"):
-            st.session_state.state = State()
-            st.experimental_rerun()
-            
-        # Add some space at the bottom
+        # Quick actions
         st.markdown("---")
         st.markdown("### Quick Actions")
         
-        # Quick action buttons
         if st.button("💳 New Transaction", use_container_width=True):
             st.session_state.show_new_transaction = True
             
@@ -155,16 +206,16 @@ if is_authenticated:
         if st.button("🎯 Create Campaign", use_container_width=True):
             st.session_state.show_create_campaign = True
         
-        # Logout button at the bottom
+        # Logout button
         st.markdown("---")
-        if st.button(" Logout", use_container_width=True, type="primary"):
+        if st.button("🚪 Logout", use_container_width=True, type="primary"):
             st.session_state.state = State()
             st.experimental_rerun()
         
-        # Version info
-        st.caption(f"v1.0.0 • {datetime.now().year} Poverty Alleviation Platform")
+        # Footer
+        st.caption(f"v1.0.0 • {datetime.now().year} © Poverty Alleviation Platform")
     
-    # Main content area
+    # Display selected page
     if selected == "Dashboard":
         dashboard.show()
     elif selected == "Transactions":
@@ -177,7 +228,7 @@ if is_authenticated:
         insights.show()
     elif selected == "Settings":
         settings.show()
-    elif selected == "Admin" and hasattr(st.session_state.state, 'is_admin') and st.session_state.state.is_admin:
+    elif selected == "Admin" and st.session_state.state.is_admin:
         admin.show()
 
 if __name__ == "__main__":

@@ -4,12 +4,12 @@ from datetime import datetime, timedelta
 import os
 from dotenv import load_dotenv
 
-# Load environment variables
-load_dotenv()
+# Import from config
+from config import settings
 
 # API configuration
-API_BASE_URL = os.getenv("API_BASE_URL", "http://localhost:8000/api/v1")
-ACCESS_TOKEN_EXPIRE_MINUTES = 30
+API_BASE_URL = settings.API_BASE_URL
+ACCESS_TOKEN_EXPIRE_MINUTES = settings.ACCESS_TOKEN_EXPIRE_MINUTES
 
 def show_login_page():
     """Display the login/registration form."""
@@ -51,7 +51,7 @@ def login_user(email: str, password: str):
     """Authenticate user with the backend."""
     try:
         with st.spinner("Signing in..."):
-            # Prepare the request data
+            # Prepare the login data
             login_data = {
                 "username": email,
                 "password": password,
@@ -61,7 +61,7 @@ def login_user(email: str, password: str):
                 "client_secret": ""
             }
             
-            # Make the request to the backend
+            # Make the login request
             response = requests.post(
                 f"{API_BASE_URL}/auth/login/access-token",
                 data=login_data,
@@ -124,7 +124,7 @@ def register_user(email: str, username: str, password: str):
     """Register a new user with the backend."""
     try:
         with st.spinner("Creating your account..."):
-            # Prepare registration data according to backend expectations
+            # Prepare registration data
             registration_data = {
                 "email": email,
                 "username": username,
