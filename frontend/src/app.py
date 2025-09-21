@@ -1054,12 +1054,13 @@ def show_login_page():
                 help="Enter your account password"
             )
 
-            # Remember me and forgot password row
-            col_a, col_b, col_c = st.columns([1, 1, 1])
-            with col_a:
-                remember_me = st.checkbox("Remember me", value=False)
-            with col_c:
-                if st.button("Forgot Password?", help="Reset your password"):
+            # Remember me checkbox
+            remember_me = st.checkbox("Remember me", value=False, help="Stay logged in for 30 days")
+
+            # Forgot password button (moved outside form)
+            col_forgot = st.columns([2, 1])
+            with col_forgot[1]:
+                if st.button("🔐 Forgot Password?", help="Reset your password", use_container_width=True):
                     st.info("🔐 Password reset functionality coming soon!")
 
             # Login button
