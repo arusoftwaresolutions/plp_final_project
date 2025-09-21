@@ -17,67 +17,83 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Add security headers and Web3 provider handling
+# Import components if needed
+try:
+    from streamlit.components.v1 import html
+except ImportError:
+    from streamlit import components as st_components
+    html = st_components.v1.html
+
+# Add security headers
 st.markdown('''
     <meta http-equiv="Content-Security-Policy" content="default-src 'self' https: 'unsafe-inline' 'unsafe-eval'; script-src 'self' https: 'unsafe-inline' 'unsafe-eval'; style-src 'self' https: 'unsafe-inline'; img-src 'self' https: data:; font-src 'self' https: data:;">
     <meta http-equiv="Feature-Policy" content="ambient-light-sensor 'none'; battery 'none'; document-domain 'none'; layout-animations 'none'; legacy-image-formats 'none'; oversized-images 'none'; vr 'none'; wake-lock 'none'">
-    <script type="text/javascript">
-    //<![CDATA[
-    (function() {
-        try {
-            // Store the original ethereum provider if it exists
-            const originalEthereum = window.ethereum;
-            
-            // Create a safe proxy for the ethereum object
-            const ethereumProxy = new Proxy({}, {
-                get: function(target, prop) {
-                    // If the property exists on the original ethereum object, return it
-                    if (originalEthereum && prop in originalEthereum) {
-                        const value = originalEthereum[prop];
-                        // If it's a function, bind it to the original ethereum object
-                        return typeof value === 'function' ? value.bind(originalEthereum) : value;
-                    }
-                    return undefined;
-                },
-                set: function(target, prop, value) {
-                    console.log('Attempt to set ethereum property:', prop, value);
-                    // Allow setting properties on the original ethereum object
-                    if (originalEthereum) {
-                        originalEthereum[prop] = value;
-                    }
-                    return true;
-                }
-            });
-
-            // Define the ethereum property with our proxy
-            Object.defineProperty(window, 'ethereum', {
-                get: function() {
-                    return ethereumProxy;
-                },
-                set: function(value) {
-                    console.log('Ethereum provider injection attempt intercepted');
-                    return false;
-                },
-                configurable: false,
-                enumerable: true
-            });
-
-            // Log when the page is fully loaded
-            window.addEventListener('load', function() {
-                console.log('Page fully loaded with Web3 provider protection');
-                if (window.ethereum) {
-                    console.log('Ethereum provider available:', 
-                        window.ethereum.isMetaMask ? 'MetaMask' : 
-                        window.ethereum.isBybitWallet ? 'Bybit Wallet' : 'Unknown provider');
-                }
-            });
-        } catch (e) {
-            console.error('Error in Web3 provider initialization:', e);
-        }
-    })();
-    //]]>
-    </script>
 ''', unsafe_allow_html=True)
+
+# Add Web3 provider handling using components.html
+web3_js = """
+<script>
+// Wrap in IIFE to avoid polluting global scope
+(function() {
+    try {
+        // Store the original ethereum provider if it exists
+        const originalEthereum = window.ethereum;
+        
+        // Create a safe proxy for the ethereum object
+        const ethereumProxy = new Proxy({}, {
+            get: function(target, prop) {
+                // If the property exists on the original ethereum object, return it
+                if (originalEthereum && prop in originalEthereum) {
+                    const value = originalEthereum[prop];
+                    // If it's a function, bind it to the original ethereum object
+                    return typeof value === 'function' ? value.bind(originalEthereum) : value;
+                }
+                return undefined;
+            },
+            set: function(target, prop, value) {
+                console.log('Attempt to set ethereum property:', prop, value);
+                // Allow setting properties on the original ethereum object
+                if (originalEthereum) {
+                    originalEthereum[prop] = value;
+                }
+                return true;
+            }
+        });
+
+        // Define the ethereum property with our proxy
+        Object.defineProperty(window, 'ethereum', {
+            get: function() {
+                return ethereumProxy;
+            },
+            set: function(value) {
+                console.log('Ethereum provider injection attempt intercepted');
+                return false;
+            },
+            configurable: false,
+            enumerable: true
+        });
+
+        // Log when the page is fully loaded
+        window.addEventListener('load', function() {
+            console.log('Page fully loaded with Web3 provider protection');
+            if (window.ethereum) {
+                console.log('Ethereum provider available:', 
+                    window.ethereum.isMetaMask ? 'MetaMask' : 
+                    window.ethereum.isBybitWallet ? 'Bybit Wallet' : 'Unknown provider');
+            }
+        });
+        
+        // Signal that the script has loaded successfully
+        console.log('Web3 provider protection initialized');
+    } catch (e) {
+        console.error('Error in Web3 provider initialization:', e);
+    }
+})();
+</script>
+"""
+
+# Use components.html to inject the JavaScript
+html(web3_js, height=0, width=0)
 
 # Custom CSS for modern styling
 def load_css():
