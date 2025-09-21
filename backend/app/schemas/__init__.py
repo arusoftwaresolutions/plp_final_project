@@ -59,6 +59,20 @@ from .poverty_area import (
     PovertyNeedsAnalysis,
 )
 
+# AI schemas
+from .ai import (
+    BudgetCategory,
+    BudgetRecommendation,
+    CampaignRecommendation,
+    LoanEligibility,
+    PovertyInsight,
+    UserFinancialProfile,
+    AIRecommendationsResponse,
+    SpendingAnalysisRequest,
+    SpendingAnalysisResponse,
+    FinancialHealthScore,
+)
+
 # Notification schemas
 from .notification import (
     Notification,

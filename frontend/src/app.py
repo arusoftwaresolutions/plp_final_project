@@ -60,8 +60,30 @@ def make_api_request(
 
         response.raise_for_status()
         return response.json()
+    except requests.exceptions.ConnectionError:
+        st.error(f"🔌 Connection Error: Cannot connect to backend server at {API_BASE_URL}")
+        st.info("💡 Make sure the backend server is running on the correct port.")
+        return None
+    except requests.exceptions.Timeout:
+        st.error("⏰ Request Timeout: The server took too long to respond.")
+        return None
+    except requests.exceptions.HTTPError as e:
+        if e.response.status_code == 401:
+            st.error("🔐 Authentication Error: Please log in again.")
+            st.session_state.authenticated = False
+            st.rerun()
+            return None
+        elif e.response.status_code == 403:
+            st.error("🚫 Access Denied: You don't have permission for this action.")
+            return None
+        elif e.response.status_code == 404:
+            st.warning("🔍 Resource Not Found: The requested data is not available.")
+            return None
+        else:
+            st.error(f"🚨 Server Error: {e.response.status_code}")
+            return None
     except requests.exceptions.RequestException as e:
-        st.error(f"API Error: {str(e)}")
+        st.error(f"🌐 Network Error: {str(e)}")
         return None
 
 # Page configuration
@@ -154,6 +176,139 @@ st.markdown("""
     margin: 0;
 }
 
+/* Navbar Styles */
+.navbar {
+    background: linear-gradient(135deg, #4b6cb7 0%, #182848 100%);
+    color: white;
+    padding: 1rem 2rem;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    position: sticky;
+    top: 0;
+    z-index: 1000;
+}
+
+.navbar-container {
+    max-width: 1400px;
+    margin: 0 auto;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.navbar-left h3 {
+    margin: 0;
+    font-size: 1.5rem;
+    font-weight: 600;
+    background: linear-gradient(45deg, #fff, #f0f8ff);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.navbar-right {
+    display: flex;
+    align-items: center;
+    gap: 2rem;
+}
+
+.nav-menu {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+}
+
+.nav-item {
+    background: rgba(255, 255, 255, 0.1);
+    color: white;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    padding: 0.5rem 1rem;
+    border-radius: 20px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    font-size: 0.9rem;
+    font-weight: 500;
+    backdrop-filter: blur(10px);
+}
+
+.nav-item:hover {
+    background: rgba(255, 255, 255, 0.2);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.nav-item.active {
+    background: rgba(255, 255, 255, 0.9);
+    color: #4b6cb7;
+    font-weight: 600;
+}
+
+.navbar-actions {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.user-info {
+    background: rgba(255, 255, 255, 0.1);
+    padding: 0.5rem 1rem;
+    border-radius: 20px;
+    font-size: 0.9rem;
+    font-weight: 500;
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.logout-btn {
+    background: rgba(220, 53, 69, 0.8);
+    color: white;
+    border: 1px solid rgba(220, 53, 69, 0.9);
+    padding: 0.5rem 1rem;
+    border-radius: 20px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    font-size: 0.9rem;
+    font-weight: 500;
+    backdrop-filter: blur(10px);
+}
+
+.logout-btn:hover {
+    background: rgba(220, 53, 69, 0.9);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(220, 53, 69, 0.3);
+}
+
+/* Mobile Navbar */
+@media (max-width: 1024px) {
+    .nav-menu {
+        display: none;
+    }
+
+    .navbar-container {
+        justify-content: space-between;
+    }
+
+    .navbar::after {
+        content: "☰";
+        font-size: 1.5rem;
+        cursor: pointer;
+        padding: 0.5rem;
+    }
+}
+
+@media (max-width: 768px) {
+    .navbar {
+        padding: 1rem;
+    }
+
+    .navbar-left h3 {
+        font-size: 1.2rem;
+    }
+
+    .user-info {
+        display: none;
+    }
+}
+
 /* Navigation styles */
 .navbar {
     background: white;
@@ -199,6 +354,7 @@ st.markdown("""
     font-weight: 600;
     color: #4b6cb7;
 }
+
 
 /* Card Styling */
 .metric-card {
@@ -546,88 +702,500 @@ div[data-testid="stSidebar"] {
     .metric-card h2 {
         font-size: 1.8rem;
     }
+
+    /* Login Page Styles */
+    .login-main-container {
+        min-height: 100vh;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 2rem;
+        position: relative;
+    }
+
+    .login-background-overlay {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.1);
+        backdrop-filter: blur(10px);
+    }
+
+    .login-wrapper {
+        width: 100%;
+        max-width: 1200px;
+        position: relative;
+        z-index: 1;
+    }
+
+    .login-card {
+        background: white;
+        border-radius: 24px;
+        box-shadow: 0 25px 50px rgba(0, 0, 0, 0.15);
+        overflow: hidden;
+        backdrop-filter: blur(20px);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+    }
+
+    .login-header-section {
+        background: linear-gradient(135deg, #4b6cb7 0%, #182848 100%);
+        color: white;
+        padding: 3rem 2rem;
+        text-align: center;
+    }
+
+    .logo-section {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-bottom: 2rem;
+        gap: 1rem;
+    }
+
+    .logo-icon {
+        font-size: 3rem;
+        background: rgba(255, 255, 255, 0.2);
+        width: 80px;
+        height: 80px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        backdrop-filter: blur(10px);
+    }
+
+    .logo-text h1 {
+        font-size: 2.5rem;
+        font-weight: 700;
+        margin: 0;
+        background: linear-gradient(45deg, #fff, #f0f8ff);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+    }
+
+    .tagline {
+        font-size: 1.1rem;
+        opacity: 0.9;
+        margin: 0.5rem 0 0 0;
+        font-weight: 300;
+    }
+
+    .welcome-text {
+        margin-top: 2rem;
+    }
+
+    .welcome-text h2 {
+        font-size: 2rem;
+        font-weight: 600;
+        margin-bottom: 0.5rem;
+    }
+
+    .welcome-text p {
+        font-size: 1rem;
+        opacity: 0.8;
+        margin: 0;
+    }
+
+    .login-form-section {
+        padding: 3rem 2rem;
+    }
+
+    .form-header {
+        text-align: center;
+        margin-bottom: 2rem;
+    }
+
+    .form-header h3 {
+        color: #2c3e50;
+        font-size: 1.8rem;
+        font-weight: 600;
+        margin-bottom: 0.5rem;
+    }
+
+    .form-subtitle {
+        color: #6c757d;
+        font-size: 1rem;
+        margin: 0;
+    }
+
+    .login-form-container {
+        max-width: 400px;
+        margin: 0 auto;
+    }
+
+    .form-spacer {
+        height: 2rem;
+    }
+
+    /* Demo Accounts Section */
+    .demo-section {
+        background: #f8f9fa;
+        padding: 2rem;
+        margin: 2rem 0;
+        border-radius: 16px;
+    }
+
+    .demo-header {
+        text-align: center;
+        margin-bottom: 1.5rem;
+    }
+
+    .demo-header h4 {
+        color: #4b6cb7;
+        font-size: 1.3rem;
+        font-weight: 600;
+        margin-bottom: 0.5rem;
+    }
+
+    .demo-header p {
+        color: #6c757d;
+        margin: 0;
+        font-size: 0.9rem;
+    }
+
+    .demo-accounts {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 1rem;
+        margin-top: 1rem;
+    }
+
+    .demo-card {
+        background: white;
+        border-radius: 12px;
+        padding: 1.5rem;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        border: 1px solid rgba(0, 0, 0, 0.05);
+        transition: all 0.3s ease;
+        position: relative;
+        overflow: hidden;
+    }
+
+    .demo-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+    }
+
+    .demo-card.admin {
+        border-left: 4px solid #ffc107;
+        background: linear-gradient(135deg, #fff9e6 0%, #fff 100%);
+    }
+
+    .demo-icon {
+        font-size: 2.5rem;
+        margin-bottom: 1rem;
+        text-align: center;
+    }
+
+    .demo-info h5 {
+        color: #2c3e50;
+        font-size: 1.1rem;
+        font-weight: 600;
+        margin-bottom: 1rem;
+        text-align: center;
+    }
+
+    .demo-info p {
+        color: #6c757d;
+        font-size: 0.9rem;
+        margin: 0.5rem 0;
+        text-align: center;
+    }
+
+    .demo-info strong {
+        color: #4b6cb7;
+    }
+
+    /* Registration Section */
+    .registration-section {
+        text-align: center;
+        padding: 2rem 0;
+    }
+
+    .divider {
+        position: relative;
+        margin: 2rem 0;
+        text-align: center;
+    }
+
+    .divider::before {
+        content: '';
+        position: absolute;
+        top: 50%;
+        left: 0;
+        right: 0;
+        height: 1px;
+        background: #e9ecef;
+    }
+
+    .divider span {
+        background: white;
+        padding: 0 1rem;
+        color: #6c757d;
+        font-size: 0.9rem;
+        position: relative;
+    }
+
+    .register-btn {
+        background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+        color: white;
+        border: none;
+        padding: 1rem 2rem;
+        border-radius: 12px;
+        font-size: 1rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        box-shadow: 0 4px 15px rgba(40, 167, 69, 0.3);
+    }
+
+    .register-btn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 25px rgba(40, 167, 69, 0.4);
+        background: linear-gradient(135deg, #218838 0%, #1dd1a1 100%);
+    }
+
+    /* Responsive Design */
+    @media (max-width: 768px) {
+        .login-main-container {
+            padding: 1rem;
+        }
+
+        .login-header-section {
+            padding: 2rem 1rem;
+        }
+
+        .logo-text h1 {
+            font-size: 2rem;
+        }
+
+        .login-form-section {
+            padding: 2rem 1rem;
+        }
+
+        .demo-accounts {
+            grid-template-columns: 1fr;
+        }
+    }
 }
 </style>
 """, unsafe_allow_html=True)
 
-# Authentication Pages
 def show_login_page():
     """Modern login page with professional design"""
+    # Hide Streamlit elements
     st.markdown("""
-    <div class="login-container">
-        <div class="login-box">
-            <div class="login-header">
-                <h1>🌍 SDG Finance</h1>
-                <p>Empowering communities through financial inclusion</p>
+    <style>
+    [data-testid="stHeader"] {display: none !important;}
+    [data-testid="stToolbar"] {display: none !important;}
+    #MainMenu {visibility: hidden !important;}
+    footer {visibility: hidden !important;}
+    </style>
+    """, unsafe_allow_html=True)
+
+    # Main login container with background
+    st.markdown("""
+    <div class="login-main-container">
+        <div class="login-background-overlay"></div>
+        <div class="login-wrapper">
+            <div class="login-card">
+                <!-- Header Section -->
+                <div class="login-header-section">
+                    <div class="logo-section">
+                        <div class="logo-icon">🌍</div>
+                        <div class="logo-text">
+                            <h1>SDG Finance</h1>
+                            <p class="tagline">Empowering communities through financial inclusion</p>
+                        </div>
+                    </div>
+
+                    <div class="welcome-text">
+                        <h2>Welcome Back</h2>
+                        <p>Sign in to your account to continue your financial journey</p>
+                    </div>
+                </div>
+
+                <!-- Login Form Section -->
+                <div class="login-form-section">
+                    <div class="form-header">
+                        <h3>🔐 Secure Login</h3>
+                        <p class="form-subtitle">Enter your credentials to access your account</p>
+                    </div>
+
+                    <div class="login-form-container">
+    """, unsafe_allow_html=True)
+
+    # Login form
+    with st.form("login_form", clear_on_submit=True):
+        col1, col2, col3 = st.columns([1, 2, 1])
+
+        with col1:
+            st.markdown("<div class='form-spacer'></div>", unsafe_allow_html=True)
+
+        with col2:
+            # Email field
+            email = st.text_input(
+                "Email Address",
+                placeholder="Enter your email address",
+                key="login_email",
+                help="Use your registered email address"
+            )
+
+            # Password field
+            password = st.text_input(
+                "Password",
+                type="password",
+                placeholder="Enter your password",
+                key="login_password",
+                help="Enter your account password"
+            )
+
+            # Remember me and forgot password row
+            col_a, col_b, col_c = st.columns([1, 1, 1])
+            with col_a:
+                remember_me = st.checkbox("Remember me", value=False)
+            with col_c:
+                if st.button("Forgot Password?", help="Reset your password"):
+                    st.info("🔐 Password reset functionality coming soon!")
+
+            # Login button
+            login_button = st.form_submit_button(
+                "🚀 Sign In",
+                use_container_width=True,
+                type="primary"
+            )
+
+        with col3:
+            st.markdown("<div class='form-spacer'></div>", unsafe_allow_html=True)
+
+    # Handle login
+    if login_button:
+        if email and password:
+            with st.spinner("Signing you in..."):
+                time.sleep(1)  # Simulate processing
+                try:
+                    response = requests.post(
+                        get_api_url("/auth/login/access-token"),
+                        data={
+                            "username": email,
+                            "password": password
+                        },
+                        headers={"Content-Type": "application/x-www-form-urlencoded"},
+                        timeout=10
+                    )
+
+                    if response.status_code == 200:
+                        data = response.json()
+                        if "access_token" in data:
+                            st.session_state.auth_token = data["access_token"]
+                            st.session_state.authenticated = True
+                            st.session_state.current_user = {"username": email}
+                            st.session_state.is_admin = False
+
+                            # Fetch user profile
+                            user_data = make_api_request("/users/me")
+                            if user_data:
+                                st.session_state.current_user = user_data
+                                roles = user_data.get("roles", [])
+                                st.session_state.is_admin = "admin" in [role.lower() for role in roles]
+
+                            st.success("🎉 Login successful! Redirecting to dashboard...")
+                            time.sleep(1.5)
+                            st.rerun()
+                        else:
+                            st.error("❌ Invalid response from server")
+                    else:
+                        st.error("❌ Invalid credentials. Please check your email and password.")
+                except Exception as e:
+                    st.error(f"❌ Connection error: {str(e)}")
+        else:
+            st.warning("⚠️ Please enter both email and password")
+
+    # Close form container and start demo section
+    st.markdown("""
+                    </div>
+
+                    <!-- Demo Accounts Section -->
+                    <div class="demo-section">
+                        <div class="demo-header">
+                            <h4>🧪 Demo Accounts</h4>
+                            <p>Try the platform with these test accounts</p>
+                        </div>
+
+                        <div class="demo-accounts">
+    """, unsafe_allow_html=True)
+
+    # Demo accounts with better styling
+    demo_cols = st.columns(3)
+
+    with demo_cols[0]:
+        st.markdown("""
+        <div class="demo-card">
+            <div class="demo-icon">👤</div>
+            <div class="demo-info">
+                <h5>User Account</h5>
+                <p><strong>Email:</strong> john@example.com</p>
+                <p><strong>Password:</strong> password123</p>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+    with demo_cols[1]:
+        st.markdown("""
+        <div class="demo-card">
+            <div class="demo-icon">👩</div>
+            <div class="demo-info">
+                <h5>User Account</h5>
+                <p><strong>Email:</strong> jane@example.com</p>
+                <p><strong>Password:</strong> password123</p>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+    with demo_cols[2]:
+        st.markdown("""
+        <div class="demo-card admin">
+            <div class="demo-icon">🔧</div>
+            <div class="demo-info">
+                <h5>Admin Account</h5>
+                <p><strong>Email:</strong> admin@example.com</p>
+                <p><strong>Password:</strong> admin123</p>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+    # Close demo section and registration section
+    st.markdown("""
+                        </div>
+                    </div>
+
+                    <!-- Registration Section -->
+                    <div class="registration-section">
+                        <div class="divider">
+                            <span>Don't have an account?</span>
+                        </div>
+                        <button class="register-btn" onclick="document.getElementById('register-btn').click();">
+                            📝 Create New Account
+                        </button>
+    """, unsafe_allow_html=True)
+
+    # Registration button (hidden, triggered by JS)
+    if st.button("📝 Register New Account", key="register-btn", help="Create a new account"):
+        st.session_state.show_register = True
+        st.rerun()
+
+    # Close main sections
+    st.markdown("""
+                    </div>
+                </div>
             </div>
         </div>
     </div>
     """, unsafe_allow_html=True)
-
-    with st.form("login_form"):
-        st.subheader("🔐 Secure Login")
-
-        col1, col2, col3 = st.columns([1, 2, 1])
-        username = st.text_input("Email", placeholder="Enter your email address")
-        password = st.text_input("Password", type="password", placeholder="Enter your password")
-
-        col1, col2, col3 = st.columns([1, 1, 1])
-        with col2:
-            login_button = st.form_submit_button("Login", use_container_width=True)
-
-    if login_button:
-        if username and password:
-            # Try to authenticate with backend using form data
-            try:
-                response = requests.post(
-                    get_api_url("/auth/login/access-token"),
-                    data={
-                        "username": username,  # The backend expects "username" field even for email
-                        "password": password
-                    },
-                    headers={"Content-Type": "application/x-www-form-urlencoded"},
-                    timeout=10
-                )
-
-                if response.status_code == 200:
-                    data = response.json()
-                    if "access_token" in data:
-                        st.session_state.auth_token = data["access_token"]
-                        st.session_state.authenticated = True
-                        st.session_state.current_user = {"username": username}
-                        st.session_state.is_admin = False  # Will be updated when we fetch user profile
-
-                        # Fetch user profile to get admin status
-                        user_data = make_api_request("/users/me")
-                        if user_data:
-                            st.session_state.current_user = user_data
-                            # Check if user has admin role
-                            roles = user_data.get("roles", [])
-                            st.session_state.is_admin = "admin" in [role.lower() for role in roles]
-
-                        st.success("✅ Login successful! Redirecting...")
-                        st.rerun()
-                    else:
-                        st.error("❌ Invalid response from server")
-                else:
-                    st.error("❌ Invalid credentials. Please try again.")
-            except Exception as e:
-                st.error(f"❌ Connection error: {str(e)}")
-        else:
-            st.error("⚠️ Please enter both email and password")
-
-    st.markdown("---")
-    st.markdown("**Demo Accounts:**")
-    st.markdown("👤 **User:** `john@example.com` / `password123`")
-    st.markdown("👤 **User:** `jane@example.com` / `password123`")
-    st.markdown("🔧 **Admin:** `admin@example.com` / `admin123`")
-
-    # Registration section
-    st.markdown("---")
-    st.markdown("**New User? Create Account:**")
-    if st.button("📝 Register New Account"):
-        st.session_state.show_register = True
-        st.rerun()
 
 def show_register_page():
     """Modern registration page with professional design"""
@@ -718,48 +1286,73 @@ def show_navbar():
 
     st.markdown("""
     <div class="navbar">
-        <div class="navbar-left">
-            <h3>🌍 SDG Finance Platform</h3>
-        </div>
-        <div class="navbar-center">
+        <div class="navbar-container">
+            <div class="navbar-left">
+                <h3>🌍 SDG Finance Platform</h3>
+            </div>
+            <div class="navbar-right">
+                <div class="nav-menu">
     """, unsafe_allow_html=True)
 
-    # Navigation links - Create horizontal layout
-    nav_cols = st.columns(len(pages) + 2)  # +2 for user info and logout
-
-    # Navigation buttons
+    # Navigation links
+    nav_items = []
     for i, page in enumerate(pages):
-        with nav_cols[i]:
-            if st.button(
-                page,
-                key=f"nav_{page}",
-                help=f"Go to {page}",
-                use_container_width=True
-            ):
-                st.session_state.current_page = page
-                st.rerun()
+        is_active = current_page == page
+        nav_items.append(f"""
+            <button class="nav-item {'active' if is_active else ''}" onclick="setPage('{page}')">
+                {page}
+            </button>
+        """)
 
-    # User info
-    with nav_cols[len(pages)]:
-        user_info = st.session_state.get('current_user', {})
-        username = user_info.get('username', 'User')
-        st.markdown(f"""
-        <div class="user-info">
-            👤 {username} {'(Admin)' if st.session_state.get('is_admin', False) else ''}
+    st.markdown("".join(nav_items), unsafe_allow_html=True)
+
+    # User info and logout section
+    user_info = st.session_state.get('current_user', {})
+    username = user_info.get('username', 'User') if isinstance(user_info, dict) else str(user_info)
+
+    st.markdown(f"""
+                </div>
+                <div class="navbar-actions">
+                    <div class="user-info">
+                        👤 {username} {'(Admin)' if st.session_state.get('is_admin', False) else ''}
+                    </div>
+                    <button class="logout-btn" onclick="logout()">
+                        🚪 Logout
+                    </button>
+                </div>
+            </div>
         </div>
-        """, unsafe_allow_html=True)
+    </div>
+    """, unsafe_allow_html=True)
 
-    # Logout button
-    with nav_cols[len(pages) + 1]:
-        if st.button("🚪 Logout", key="logout", use_container_width=True):
-            st.session_state.authenticated = False
-            st.session_state.auth_token = None
-            st.session_state.current_user = None
-            st.session_state.is_admin = False
-            st.success("Logged out successfully!")
-            st.rerun()
+    # JavaScript for navigation
+    st.markdown(f"""
+    <script>
+    function setPage(page) {{
+        window.location.href = window.location.href.split('?')[0] + '?page=' + page;
+    }}
 
-    st.markdown("</div></div>", unsafe_allow_html=True)
+    function logout() {{
+        window.location.href = window.location.href.split('?')[0];
+    }}
+
+    // Check URL parameters for current page
+    const urlParams = new URLSearchParams(window.location.search);
+    const pageParam = urlParams.get('page');
+    if (pageParam) {{
+        // This will trigger a rerun when the page changes
+        if (window.Streamlit) {{
+            window.Streamlit.setComponentValue('{{"page": "' + pageParam + '"}}');
+        }}
+    }}
+    </script>
+    """, unsafe_allow_html=True)
+
+    # Handle page changes through session state
+    if 'page_change' in st.session_state and st.session_state.page_change:
+        st.session_state.current_page = st.session_state.page_change
+        st.session_state.page_change = None
+        st.rerun()
 
 def show_dashboard():
     """Professional dashboard with real backend data"""
@@ -1256,12 +1849,32 @@ def main():
             show_login_page()
         return
 
+    # Handle URL parameters for navigation
+    try:
+        # Get current page from URL parameters or session state
+        current_page = st.session_state.get('current_page', 'Dashboard')
+
+        # Check if there's a page parameter in the URL
+        if 'page' in st.query_params:
+            requested_page = st.query_params['page']
+            if requested_page in ["Dashboard", "AI Recommendations", "Transactions", "Crowdfunding", "Microloans", "Poverty Map", "Profile"]:
+                if requested_page == "Admin Panel" and not st.session_state.get('is_admin', False):
+                    st.error("❌ Access denied. Admin privileges required.")
+                else:
+                    current_page = requested_page
+                    st.session_state.current_page = current_page
+
+        # Set default page if not set
+        if 'current_page' not in st.session_state:
+            st.session_state.current_page = 'Dashboard'
+
+    except Exception as e:
+        st.session_state.current_page = 'Dashboard'
+
     # Show navigation
     show_navbar()
 
     # Route to pages
-    current_page = st.session_state.get('current_page', 'Dashboard')
-
     if current_page == "Dashboard":
         show_dashboard()
     elif current_page == "AI Recommendations":
