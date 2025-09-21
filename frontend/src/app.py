@@ -359,35 +359,25 @@ async def render_page(page_name: str) -> None:
 
 async def main():
     """Main application function."""
-    # Check authentication
-    if not st.session_state.get('authenticated', False):
-        # Try to render login page using PAGES dictionary
-        if 'Login' in PAGES:
-            try:
-                login_module = PAGES['Login']['module']
-                if hasattr(login_module, 'show'):
-                    if asyncio.iscoroutinefunction(login_module.show):
-                        await login_module.show()
-                    else:
-                        login_module.show()
-                    return  # Exit if login module worked
-                else:
-                    st.error("Auth module has no 'show' method")
-            except Exception as e:
-                st.error(f"Error in auth module: {str(e)}")
-                logger.error(f"Auth module error: {str(e)}")
+    # Initialize session state
+    if 'authenticated' not in st.session_state:
+        st.session_state.authenticated = False
+        st.session_state.is_admin = False
+        st.session_state.current_user = None
 
-        # Fallback: Simple login form if auth module fails
-        st.title("🔑 Login to SDG Finance Platform")
+    # Check authentication
+    if not st.session_state.authenticated:
+        # Simple login form - no dependencies on external modules
+        st.title("🔑 SDG Finance Platform")
         st.markdown("---")
 
+        st.subheader("Please log in to continue")
+
         with st.form("login_form"):
-            st.subheader("Please log in to continue")
             username = st.text_input("Username", placeholder="Enter your username")
             password = st.text_input("Password", type="password", placeholder="Enter your password")
-            remember_me = st.checkbox("Remember me")
 
-            col1, col2, col3 = st.columns([1, 1, 2])
+            col1, col2 = st.columns(2)
             with col1:
                 login_button = st.form_submit_button("Login", use_container_width=True)
             with col2:
@@ -422,37 +412,43 @@ async def main():
 
     # User is authenticated - show main application
     st.title("🌍 SDG Finance Platform Dashboard")
-    st.success(f"Welcome back, {st.session_state.get('current_user', 'User')}!")
+    st.success(f"Welcome back, {st.session_state.current_user}!")
 
-    # Navigation menu
+    # Simple navigation
     st.markdown("---")
-    menu_items = ["Dashboard", "AI Recommendations", "Transactions", "Crowdfunding", "Microloans", "Poverty Map", "Profile"]
-    if st.session_state.get('is_admin', False):
-        menu_items.append("Admin Panel")
+    pages = ["Dashboard", "AI Recommendations", "Transactions", "Crowdfunding", "Microloans", "Poverty Map", "Profile"]
+    if st.session_state.is_admin:
+        pages.append("Admin Panel")
 
-    selected_page = st.selectbox("Navigate to:", menu_items, key="nav_menu")
+    if 'current_page' not in st.session_state:
+        st.session_state.current_page = "Dashboard"
 
-    if selected_page and selected_page != st.session_state.get('current_page', ''):
+    selected_page = st.selectbox("Navigate to:", pages, index=pages.index(st.session_state.current_page) if st.session_state.current_page in pages else 0)
+
+    if selected_page != st.session_state.current_page:
         st.session_state.current_page = selected_page
         st.rerun()
 
     # Show current page content
-    current_page = st.session_state.get('current_page', 'Dashboard')
-    if current_page in PAGES:
-        try:
-            page_config = PAGES[current_page]
-            if hasattr(page_config["module"], 'show'):
-                if asyncio.iscoroutinefunction(page_config["module"].show):
-                    await page_config["module"].show()
-                else:
-                    page_config["module"].show()
-        except Exception as e:
-            st.error(f"Error loading {current_page}: {str(e)}")
-            # Show a simple placeholder for the page
-            st.subheader(f"📊 {current_page}")
-            st.write(f"This is the {current_page.lower()} page. The actual content will be loaded from the module.")
-    else:
-        st.warning("Page not found")
+    st.subheader(f"📊 {st.session_state.current_page}")
+    st.write(f"Welcome to the {st.session_state.current_page.lower()} page!")
+
+    if st.session_state.current_page == "Dashboard":
+        st.write("This is your main dashboard with an overview of all activities.")
+    elif st.session_state.current_page == "AI Recommendations":
+        st.write("AI-powered recommendations for financial decisions.")
+    elif st.session_state.current_page == "Transactions":
+        st.write("View and manage your financial transactions.")
+    elif st.session_state.current_page == "Crowdfunding":
+        st.write("Support community projects through crowdfunding.")
+    elif st.session_state.current_page == "Microloans":
+        st.write("Apply for or manage microloans.")
+    elif st.session_state.current_page == "Poverty Map":
+        st.write("Interactive map showing poverty indicators.")
+    elif st.session_state.current_page == "Profile":
+        st.write("Manage your profile and account settings.")
+    elif st.session_state.current_page == "Admin Panel":
+        st.write("Administrative tools and system management.")
 
     # Logout button
     if st.button("🚪 Logout", key="logout_btn"):
