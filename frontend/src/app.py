@@ -17,36 +17,62 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Add security headers and handle Web3 provider conflicts
+# Add security headers
 st.markdown("""
     <meta http-equiv="Content-Security-Policy" content="default-src 'self' https: 'unsafe-inline' 'unsafe-eval'; script-src 'self' https: 'unsafe-inline' 'unsafe-eval'; style-src 'self' https: 'unsafe-inline'; img-src 'self' https: data:; font-src 'self' https: data:;">
     <meta http-equiv="Feature-Policy" content="ambient-light-sensor 'none'; battery 'none'; document-domain 'none'; layout-animations 'none'; legacy-image-formats 'none'; oversized-images 'none'; vr 'none'; wake-lock 'none'">
-    <script>
-        // Handle Web3 provider conflicts
-        document.addEventListener('DOMContentLoaded', function() {
-            // Check for Bybit wallet
-            if (window.ethereum && window.ethereum.isBybitWallet) {
-                console.log("Bybit Wallet detected");
-                // You can add custom Bybit wallet handling here if needed
-            }
-            
-            // Prevent multiple ethereum provider injections
-            if (window.ethereum && !window.originalEthereum) {
-                window.originalEthereum = window.ethereum;
-                Object.defineProperty(window, 'ethereum', {
-                    get() {
-                        return window.originalEthereum;
-                    },
-                    set(value) {
-                        console.log('Ethereum provider injection attempt:', value);
-                        // You can add custom logic here to handle the new provider
-                        window.originalEthereum = value;
-                    },
-                    configurable: false,
-                    enumerable: true
-                });
+    <script type="text/javascript">
+    // Handle Web3 provider conflicts
+    (function() {
+        // Store the original ethereum provider if it exists
+        const originalEthereum = window.ethereum;
+        
+        // Create a safe proxy for the ethereum object
+        const ethereumProxy = new Proxy({}, {
+            get(target, prop) {
+                // If the property exists on the original ethereum object, return it
+                if (originalEthereum && prop in originalEthereum) {
+                    const value = originalEthereum[prop];
+                    // If it's a function, bind it to the original ethereum object
+                    return typeof value === 'function' ? value.bind(originalEthereum) : value;
+                }
+                return undefined;
+            },
+            set(target, prop, value) {
+                console.log('Attempt to set ethereum property:', prop, value);
+                // Allow setting properties on the original ethereum object
+                if (originalEthereum) {
+                    originalEthereum[prop] = value;
+                }
+                return true;
             }
         });
+
+        // Define the ethereum property with our proxy
+        Object.defineProperty(window, 'ethereum', {
+            get() {
+                return ethereumProxy;
+            },
+            set(value) {
+                console.log('Ethereum provider injection attempt intercepted');
+                // You can add custom logic here to handle the new provider
+                // For now, we'll just log it and prevent the set
+                return false;
+            },
+            configurable: false,
+            enumerable: true
+        });
+
+        // Log when the page is fully loaded
+        window.addEventListener('load', function() {
+            console.log('Page fully loaded with Web3 provider protection');
+            if (window.ethereum) {
+                console.log('Ethereum provider available:', 
+                    window.ethereum.isMetaMask ? 'MetaMask' : 
+                    window.ethereum.isBybitWallet ? 'Bybit Wallet' : 'Unknown provider');
+            }
+        });
+    })();
     </script>
 """, unsafe_allow_html=True)
 
@@ -618,36 +644,46 @@ def run():
         st.error(f"An error occurred: {str(e)}")
         st.exception(e)  # This will show the full traceback in the app
 
-if __name__ == "__main__":
+def run_streamlit():
+    """Run the Streamlit app with default settings."""
+    import subprocess
     import sys
-    import asyncio
-    
-    # Check if we're running in Streamlit
+    file_path = str(Path(__file__).resolve())
+    cmd = [sys.executable, "-m", "streamlit", "run", file_path]
+    subprocess.run(cmd)
+
+if __name__ == "__main__":
     try:
         import streamlit as st
         if hasattr(st, '_is_running_with_streamlit'):
-            # If yes, just run the main function
+            # If running in Streamlit, just run the main function
+            import asyncio
             asyncio.run(main())
         else:
-            # If not, provide instructions
+            # If not in Streamlit, show instructions and try to run directly
             print("\n" + "="*60)
             print("SDG Finance Platform - Streamlit Application")
             print("="*60)
             print("\nTo run this application, please use one of the following commands:")
             print("\nFor development:")
-            print("    streamlit run app.py")
+            print(f"    {sys.executable} -m streamlit run {Path(__file__).name}")
             print("\nFor production with specific settings:")
-            print("    streamlit run app.py --server.port=8501 --server.address=0.0.0.0")
+            print(f"    {sys.executable} -m streamlit run --server.port=8501 --server.address=0.0.0.0 {Path(__file__).name}")
             print("\n" + "="*60 + "\n")
             
-            # Ask if they want to run it with default settings
-            response = input("Would you like to run the app with default settings? (y/n): ")
-            if response.lower() == 'y':
-                import subprocess
-                file_path = str(Path(__file__).resolve())
-                subprocess.run(["streamlit", "run", file_path])
+            # Try to run with default settings
+            try:
+                run_streamlit()
+            except Exception as e:
+                print(f"Failed to start Streamlit: {str(e)}")
+                print("\nPlease make sure Streamlit is installed and try running the command manually.")
     except ImportError:
         print("Error: Streamlit is not installed. Please install it with:")
-        print("    pip install streamlit")
+        print(f"    {sys.executable} -m pip install streamlit")
     except Exception as e:
         print(f"An error occurred: {str(e)}")
+        # Try to run with default settings as a fallback
+        try:
+            run_streamlit()
+        except Exception as e:
+            print(f"Failed to start Streamlit: {str(e)}")
