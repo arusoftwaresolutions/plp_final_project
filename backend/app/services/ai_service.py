@@ -20,7 +20,7 @@ from backend.app.schemas.ai import (
     BudgetRecommendation, BudgetCategory, CampaignRecommendation,
     LoanEligibility, PovertyInsight, UserFinancialProfile
 )
-from backendapp.core.config import settings
+from backend.app.core.config import settings
 
 logger = logging.getLogger(__name__)
 

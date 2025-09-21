@@ -3,6 +3,14 @@ SDG 1: No Poverty - Financial Inclusion Platform
 A modern, professional frontend built with Streamlit
 """
 
+import streamlit as st
+import requests
+import pandas as pd
+import numpy as np
+import plotly.express as px
+import plotly.graph_objects as go
+from datetime import datetime, timedelta
+import time
 from typing import Dict, Optional
 
 # Optional dependencies with fallbacks

@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from backend.app import models, schemas
 from backend.app.api import deps
 from backend.app.db.session import get_db
-from backend.app.services import ai as ai_service
+from backend.app.services import ai_service
 
 router = APIRouter()
 
