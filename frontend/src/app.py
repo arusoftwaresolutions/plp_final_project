@@ -14,15 +14,7 @@ st.set_page_config(
     page_title="SDG Finance Platform",
     page_icon="🌍",
     layout="wide",
-    initial_sidebar_state="expanded",
-    # Set CSP header
-    page_headers={
-        "Content-Security-Policy": "default-src 'self' https: 'unsafe-inline' 'unsafe-eval'; "
-                                  "script-src 'self' https: 'unsafe-inline' 'unsafe-eval'; "
-                                  "style-src 'self' https: 'unsafe-inline'; "
-                                  "img-src 'self' https: data:; "
-                                  "font-src 'self' https: data:;"
-    }
+    initial_sidebar_state="expanded"
 )
 
 # Import components
@@ -37,6 +29,7 @@ st.markdown('''
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="description" content="SDG Finance Platform">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self' https: 'unsafe-inline' 'unsafe-eval'; script-src 'self' https: 'unsafe-inline' 'unsafe-eval'; style-src 'self' https: 'unsafe-inline'; img-src 'self' https: data:; font-src 'self' https: data:;">
 ''', unsafe_allow_html=True)
 
 # Initialize main content container
