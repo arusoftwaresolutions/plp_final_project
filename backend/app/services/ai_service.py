@@ -45,7 +45,7 @@ class AIService:
                 select(User)
                 .options(
                     selectinload(User.transactions),
-                    selectinload(User.loans)
+                    joinedload(User.loans)
                 )
                 .where(User.id == user_id)
             )
@@ -88,8 +88,255 @@ class AIService:
         except Exception as e:
             logger.error(f"Error getting financial profile for user {user_id}: {str(e)}")
             raise
-    
-    async def train_models(self, db: AsyncSession) -> None:
+
+    async def get_user_financial_profile(self, db: AsyncSession, user_id: int) -> UserFinancialProfile:
+        """Get comprehensive financial profile for a user (public method)."""
+        return await self._get_user_financial_profile(db, user_id)
+
+    async def generate_budget_recommendations(self, db: AsyncSession, user_id: int) -> List[BudgetCategory]:
+        """Generate budget recommendations for a user."""
+        try:
+            budget_rec = await self.get_budget_recommendation(db, user_id, "monthly")
+            return budget_rec.categories
+        except Exception as e:
+            logger.error(f"Error generating budget recommendations: {str(e)}")
+            # Return default recommendations
+            return [
+                BudgetCategory(
+                    category="Food",
+                    current_amount=0.0,
+                    suggested_max=300.0,
+                    recommendation="Consider meal planning to reduce food expenses",
+                    description="Basic food and groceries"
+                ),
+                BudgetCategory(
+                    category="Transport",
+                    current_amount=0.0,
+                    suggested_max=150.0,
+                    recommendation="Use public transport when possible",
+                    description="Transportation costs"
+                )
+            ]
+
+    async def generate_campaign_recommendations(self, db: AsyncSession, user_id: int) -> List[CampaignRecommendation]:
+        """Generate campaign recommendations for a user."""
+        try:
+            return await self.get_campaign_recommendations(db, user_id, limit=5)
+        except Exception as e:
+            logger.error(f"Error generating campaign recommendations: {str(e)}")
+            return []
+
+    async def assess_loan_eligibility(self, db: AsyncSession, user_id: int) -> LoanEligibility:
+        """Assess loan eligibility for a user."""
+        try:
+            # Get user's financial profile
+            profile = await self._get_user_financial_profile(db, user_id)
+
+            # Simple eligibility check based on credit score and debt
+            if profile.credit_score < 600:
+                return LoanEligibility(
+                    is_eligible=False,
+                    reason="Credit score is too low (minimum 600 required)",
+                    max_eligible_amount=0.0,
+                    recommended_amount=0.0,
+                    interest_rate=0.0,
+                    monthly_payment=0.0
+                )
+
+            # Calculate maximum eligible amount based on income and debt
+            monthly_income = profile.total_income / 12 if profile.total_income > 0 else 0
+            max_monthly_payment = (monthly_income * 0.4) - (profile.total_debt / 12)  # Max 40% DTI
+
+            if max_monthly_payment <= 0:
+                return LoanEligibility(
+                    is_eligible=False,
+                    reason="Insufficient income for loan payments",
+                    max_eligible_amount=0.0,
+                    recommended_amount=0.0,
+                    interest_rate=0.0,
+                    monthly_payment=0.0
+                )
+
+            # Estimate loan terms
+            interest_rate = self._calculate_interest_rate(profile.credit_score)
+            max_loan_amount = max_monthly_payment * 12 * 5  # 5 years max term
+
+            return LoanEligibility(
+                is_eligible=True,
+                reason="Eligible based on credit score and income",
+                max_eligible_amount=float(max_loan_amount),
+                recommended_amount=float(max_loan_amount * 0.8),  # Recommend 80% of max
+                interest_rate=float(interest_rate),
+                monthly_payment=float(max_monthly_payment)
+            )
+
+        except Exception as e:
+            logger.error(f"Error assessing loan eligibility: {str(e)}")
+            return LoanEligibility(
+                is_eligible=False,
+                reason="Unable to assess eligibility",
+                max_eligible_amount=0.0,
+                recommended_amount=0.0,
+                interest_rate=0.0,
+                monthly_payment=0.0
+            )
+
+    async def generate_poverty_insights(self, db: AsyncSession, user_id: int) -> List[PovertyInsight]:
+        """Generate poverty insights for a user."""
+        try:
+            # Get poverty areas with high poverty rates
+            result = await db.execute(
+                select(PovertyArea)
+                .where(PovertyArea.poverty_rate > 25)  # High poverty areas
+                .order_by(PovertyArea.poverty_rate.desc())
+                .limit(5)
+            )
+            areas = result.scalars().all()
+
+            insights = []
+            for area in areas:
+                insights.append(PovertyInsight(
+                    area_id=area.id,
+                    area_name=area.name,
+                    poverty_rate=float(area.poverty_rate),
+                    average_income=float(area.average_income),
+                    population=int(area.population),
+                    insights=[
+                        f"High poverty rate of {area.poverty_rate}% requires urgent attention",
+                        f"Low average income of ${area.average_income} indicates economic hardship",
+                        "Targeted interventions needed for sustainable development"
+                    ],
+                    generated_at=datetime.utcnow()
+                ))
+
+            return insights
+
+        except Exception as e:
+            logger.error(f"Error generating poverty insights: {str(e)}")
+            return []
+
+    async def analyze_spending_patterns(
+        self,
+        db: AsyncSession,
+        user_id: int,
+        request: schemas.SpendingAnalysisRequest
+    ) -> schemas.SpendingAnalysisResponse:
+        """Analyze user spending patterns and provide insights."""
+        try:
+            # Get time period
+            end_date = request.end_date or datetime.utcnow()
+            start_date = request.start_date or (end_date - timedelta(days=90))
+
+            # Get transactions for the period
+            result = await db.execute(
+                select(Transaction)
+                .where(
+                    and_(
+                        Transaction.user_id == user_id,
+                        Transaction.transaction_date >= start_date,
+                        Transaction.transaction_date <= end_date
+                    )
+                )
+                .options(selectinload(Transaction.category))
+            )
+            transactions = result.scalars().all()
+
+            # Analyze spending by category
+            category_totals = {}
+            total_spending = 0
+
+            for transaction in transactions:
+                if transaction.transaction_type == 'EXPENSE':
+                    category = transaction.category.name if transaction.category else 'Other'
+                    amount = abs(float(transaction.amount))
+                    category_totals[category] = category_totals.get(category, 0) + amount
+                    total_spending += amount
+
+            # Generate trends and recommendations
+            trends = []
+            if category_totals:
+                largest_category = max(category_totals.items(), key=lambda x: x[1])
+                if largest_category[1] / total_spending > 0.3:
+                    trends.append(f"Your largest expense category is {largest_category[0]} at {largest_category[1]/total_spending*100:.1f}% of total spending")
+
+            recommendations = []
+            if total_spending > 0:
+                recommendations.append("Consider creating a budget to better track your expenses")
+                recommendations.append("Review your largest expense categories for potential savings")
+
+            return schemas.SpendingAnalysisResponse(
+                user_id=user_id,
+                analysis_period={"start": start_date, "end": end_date},
+                total_spending=float(total_spending),
+                category_breakdown=category_totals,
+                trends=trends,
+                recommendations=recommendations,
+                generated_at=datetime.utcnow()
+            )
+
+        except Exception as e:
+            logger.error(f"Error analyzing spending patterns: {str(e)}")
+            raise
+
+    async def calculate_financial_health_score(
+        self,
+        db: AsyncSession,
+        user_id: int
+    ) -> schemas.FinancialHealthScore:
+        """Calculate user's financial health score."""
+        try:
+            profile = await self._get_user_financial_profile(db, user_id)
+
+            # Calculate score components (0-100 scale)
+            income_score = min(100, max(0, int(profile.total_income / 100)))  # Income contribution
+            debt_score = max(0, 100 - min(100, int(profile.total_debt / 100)))  # Debt impact
+            credit_score = int((profile.credit_score - 300) / 5.5)  # Credit score contribution
+            savings_score = min(100, profile.active_loans * 20)  # Fewer loans = higher score
+
+            # Weighted overall score
+            overall_score = int(
+                income_score * 0.3 +
+                debt_score * 0.3 +
+                credit_score * 0.25 +
+                savings_score * 0.15
+            )
+
+            # Determine risk level
+            if overall_score >= 80:
+                risk_level = "Low"
+            elif overall_score >= 60:
+                risk_level = "Medium"
+            else:
+                risk_level = "High"
+
+            # Generate recommendations
+            recommendations = []
+            if income_score < 50:
+                recommendations.append("Consider increasing your income through additional sources")
+            if debt_score < 50:
+                recommendations.append("Focus on reducing your debt burden")
+            if credit_score < 60:
+                recommendations.append("Work on improving your credit score")
+            if savings_score < 60:
+                recommendations.append("Build an emergency fund for financial security")
+
+            return schemas.FinancialHealthScore(
+                user_id=user_id,
+                overall_score=overall_score,
+                score_breakdown={
+                    "income": income_score,
+                    "debt": debt_score,
+                    "credit": credit_score,
+                    "savings": savings_score
+                },
+                risk_level=risk_level,
+                recommendations=recommendations,
+                generated_at=datetime.utcnow()
+            )
+
+        except Exception as e:
+            logger.error(f"Error calculating financial health score: {str(e)}")
+            raise
         """Train machine learning models with the latest data."""
         # This would be called periodically (e.g., daily) to retrain models
         await self._train_budget_model(db)

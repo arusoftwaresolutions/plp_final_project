@@ -7,7 +7,8 @@ from .endpoints import (
     microloans,
     crowdfunding,
     poverty_areas,
-    notifications
+    notifications,
+    ai  # Add AI endpoints
 )
 
 api_router = APIRouter()
@@ -20,3 +21,4 @@ api_router.include_router(microloans.router, prefix="/microloans", tags=["Microl
 api_router.include_router(crowdfunding.router, prefix="/crowdfunding", tags=["Crowdfunding"])
 api_router.include_router(poverty_areas.router, prefix="/poverty-areas", tags=["Poverty Areas"])
 api_router.include_router(notifications.router, prefix="/notifications", tags=["Notifications"])
+api_router.include_router(ai.router, prefix="/ai", tags=["AI"])  # Add AI router

@@ -55,14 +55,18 @@ async def update_user_me(
     user = await user_service.update(db, db_obj=current_user, obj_in=user_in)
     return user
 
-@router.get("/me", response_model=schemas.UserResponse)
-async def read_user_me(
+@router.put("/me", response_model=schemas.UserResponse)
+async def update_user_me(
+    *,
+    db: AsyncSession = Depends(get_db),
+    user_in: schemas.UserUpdate,
     current_user: models.User = Depends(get_current_active_user),
 ) -> Any:
     """
-    Get current user.
+    Update current user profile.
     """
-    return current_user
+    user = await user_service.update(db, db_obj=current_user, obj_in=user_in)
+    return user
 
 @router.get("/{user_id}", response_model=schemas.UserResponse)
 async def read_user_by_id(

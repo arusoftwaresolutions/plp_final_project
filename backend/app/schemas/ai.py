@@ -65,3 +65,43 @@ class UserFinancialProfile(BaseModel):
     total_debt: float = Field(0.0, description="Total outstanding debt")
     credit_score: int = Field(300, description="Credit score (300-850)")
     active_loans: int = Field(0, description="Number of active loans")
+
+
+# Response schemas for API endpoints
+class AIRecommendationsResponse(BaseModel):
+    """Response schema for AI recommendations."""
+    budget_recommendations: List[BudgetCategory] = Field(..., description="Budget recommendations")
+    campaign_recommendations: List[CampaignRecommendation] = Field(..., description="Campaign recommendations")
+    loan_eligibility: LoanEligibility = Field(..., description="Loan eligibility information")
+    poverty_insights: List[PovertyInsight] = Field(..., description="Poverty insights")
+    generated_at: datetime = Field(..., description="When recommendations were generated")
+    user_id: int = Field(..., description="ID of the user")
+    note: Optional[str] = Field(None, description="Additional notes")
+
+
+class SpendingAnalysisRequest(BaseModel):
+    """Request schema for spending analysis."""
+    start_date: Optional[datetime] = Field(None, description="Start date for analysis")
+    end_date: Optional[datetime] = Field(None, description="End date for analysis")
+    categories: Optional[List[str]] = Field(None, description="Categories to analyze")
+
+
+class SpendingAnalysisResponse(BaseModel):
+    """Response schema for spending analysis."""
+    user_id: int = Field(..., description="ID of the user")
+    analysis_period: Dict[str, datetime] = Field(..., description="Analysis period")
+    total_spending: float = Field(..., description="Total spending in period")
+    category_breakdown: Dict[str, float] = Field(..., description="Spending by category")
+    trends: List[str] = Field(..., description="Spending trends and insights")
+    recommendations: List[str] = Field(..., description="Personalized recommendations")
+    generated_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class FinancialHealthScore(BaseModel):
+    """Financial health score schema."""
+    user_id: int = Field(..., description="ID of the user")
+    overall_score: int = Field(..., description="Overall financial health score (0-100)")
+    score_breakdown: Dict[str, int] = Field(..., description="Breakdown of scores by category")
+    risk_level: str = Field(..., description="Risk level (Low/Medium/High)")
+    recommendations: List[str] = Field(..., description="Recommendations to improve financial health")
+    generated_at: datetime = Field(default_factory=datetime.utcnow)

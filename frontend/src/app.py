@@ -1,3 +1,8 @@
+"""
+SDG 1: No Poverty - Financial Inclusion Platform
+A modern, professional frontend built with Streamlit
+"""
+
 import streamlit as st
 import requests
 import json
@@ -5,6 +10,8 @@ import pandas as pd
 from datetime import datetime, timedelta
 import plotly.express as px
 import plotly.graph_objects as go
+from typing import Dict, List, Optional, Any
+import uuid
 
 # Try to import folium for better mapping
 try:
@@ -14,16 +21,21 @@ try:
 except ImportError:
     FOLIUM_AVAILABLE = False
 
-# Backend API Configuration - Matching your actual backend
+# Backend API Configuration
 API_BASE_URL = "https://plp-final-project-bgex.onrender.com"
 API_PREFIX = "/api/v1"
 
-def get_api_url(endpoint):
+def get_api_url(endpoint: str) -> str:
     """Get full API URL"""
     return f"{API_BASE_URL}{API_PREFIX}{endpoint}"
 
-def make_api_request(endpoint, method="GET", data=None, headers=None):
-    """Make API request with proper authentication"""
+def make_api_request(
+    endpoint: str,
+    method: str = "GET",
+    data: Optional[Dict] = None,
+    headers: Optional[Dict] = None
+) -> Optional[Dict]:
+    """Make API request with proper authentication and error handling"""
     try:
         url = get_api_url(endpoint)
         default_headers = {
@@ -52,59 +64,107 @@ def make_api_request(endpoint, method="GET", data=None, headers=None):
         st.error(f"API Error: {str(e)}")
         return None
 
-# Set page config
+# Page configuration
 st.set_page_config(
     page_title="SDG Finance Platform",
     page_icon="🌍",
     layout="wide",
-    initial_sidebar_state="collapsed"
+    initial_sidebar_state="collapsed",
+    menu_items={
+        'Get Help': None,
+        'Report a bug': None,
+        'About': None
+    }
 )
 
-# Global CSS for professional design
+# Professional CSS Styling
 st.markdown("""
 <style>
-/* Professional fintech styling */
+/* Modern Fintech Styling */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
 .main {
     background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
     min-height: 100vh;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 }
 
+/* Login Page Styling */
 .login-container {
     display: flex;
     align-items: center;
     justify-content: center;
     min-height: 100vh;
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    padding: 2rem;
 }
 
 .login-box {
     background: white;
     padding: 3rem;
-    border-radius: 20px;
-    box-shadow: 0 20px 40px rgba(0,0,0,0.1);
-    max-width: 450px;
+    border-radius: 24px;
+    box-shadow: 0 25px 50px rgba(0,0,0,0.15);
+    max-width: 480px;
     width: 100%;
-    margin: 2rem;
+    text-align: center;
+    border: 1px solid rgba(255,255,255,0.2);
 }
 
+.login-header {
+    margin-bottom: 2rem;
+}
+
+.login-header h1 {
+    color: #2c3e50;
+    font-size: 2.5rem;
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+}
+
+.login-header p {
+    color: #6c757d;
+    font-size: 1.1rem;
+    margin: 0;
+}
+
+/* App Header Styling */
 .app-header {
     background: linear-gradient(135deg, #4b6cb7 0%, #182848 100%);
     color: white;
-    padding: 1.5rem 2rem;
-    border-radius: 0 0 20px 20px;
+    padding: 2rem 2rem;
+    border-radius: 0 0 24px 24px;
     margin-bottom: 2rem;
-    box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+    box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+    text-align: center;
 }
 
+.app-header h1 {
+    font-size: 2.5rem;
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+}
+
+.app-header p {
+    font-size: 1.1rem;
+    opacity: 0.9;
+    margin: 0;
+}
+
+/* Navigation Bar Styling */
 .navbar {
     background: white;
-    padding: 1rem 2rem;
-    border-radius: 10px;
-    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    padding: 1.5rem 2rem;
+    border-radius: 16px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.08);
     margin-bottom: 2rem;
     display: flex;
     justify-content: space-between;
     align-items: center;
+    border: 1px solid rgba(0,0,0,0.05);
 }
 
 .nav-links {
@@ -116,147 +176,336 @@ st.markdown("""
 .nav-link {
     color: #4b6cb7;
     text-decoration: none;
-    font-weight: 500;
-    padding: 0.5rem 1rem;
-    border-radius: 8px;
-    transition: all 0.3s;
-    border: none;
+    font-weight: 600;
+    padding: 0.75rem 1.5rem;
+    border-radius: 12px;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    border: 2px solid transparent;
     background: none;
     cursor: pointer;
+    font-size: 0.95rem;
 }
 
 .nav-link:hover {
-    background: #f0f4ff;
+    background: rgba(75, 108, 183, 0.1);
     color: #182848;
+    border-color: rgba(75, 108, 183, 0.3);
+    transform: translateY(-1px);
 }
 
 .nav-link.active {
-    background: #4b6cb7;
+    background: linear-gradient(135deg, #4b6cb7 0%, #182848 100%);
     color: white;
+    box-shadow: 0 4px 12px rgba(75, 108, 183, 0.3);
 }
 
+.user-info {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    background: rgba(75, 108, 183, 0.1);
+    padding: 0.75rem 1.5rem;
+    border-radius: 20px;
+    font-weight: 600;
+    color: #4b6cb7;
+}
+
+/* Card Styling */
 .metric-card {
     background: white;
-    padding: 1.5rem;
-    border-radius: 15px;
-    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-    border-left: 5px solid #4b6cb7;
+    padding: 2rem;
+    border-radius: 20px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+    border-left: 6px solid #4b6cb7;
     text-align: center;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    border: 1px solid rgba(0,0,0,0.05);
+}
+
+.metric-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 12px 40px rgba(0,0,0,0.15);
 }
 
 .metric-card h3 {
     color: #4b6cb7;
-    margin-bottom: 0.5rem;
-    font-size: 0.9rem;
+    margin-bottom: 0.75rem;
+    font-size: 1rem;
     font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
 }
 
 .metric-card h2 {
     color: #2c3e50;
     margin: 0;
-    font-size: 1.8rem;
+    font-size: 2.5rem;
     font-weight: 700;
 }
 
 .campaign-card {
     background: white;
-    padding: 1.5rem;
-    border-radius: 15px;
-    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-    margin: 1rem 0;
-    border-left: 5px solid #4b6cb7;
+    padding: 2rem;
+    border-radius: 20px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+    margin: 1.5rem 0;
+    border-left: 6px solid #4b6cb7;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    border: 1px solid rgba(0,0,0,0.05);
+}
+
+.campaign-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 12px 40px rgba(0,0,0,0.15);
 }
 
 .loan-card {
     background: white;
-    padding: 1.5rem;
-    border-radius: 15px;
-    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-    margin: 1rem 0;
-    border-left: 5px solid #28a745;
+    padding: 2rem;
+    border-radius: 20px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+    margin: 1.5rem 0;
+    border-left: 6px solid #28a745;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    border: 1px solid rgba(0,0,0,0.05);
+}
+
+.loan-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 12px 40px rgba(0,0,0,0.15);
 }
 
 .ai-card {
     background: white;
-    padding: 1.5rem;
-    border-radius: 15px;
-    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-    margin: 1rem 0;
-    border-left: 5px solid #ffc107;
+    padding: 2rem;
+    border-radius: 20px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+    margin: 1.5rem 0;
+    border-left: 6px solid #ffc107;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    border: 1px solid rgba(0,0,0,0.05);
+}
+
+.ai-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 12px 40px rgba(0,0,0,0.15);
 }
 
 .transaction-card {
     background: white;
-    padding: 1rem;
-    border-radius: 10px;
-    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-    margin: 0.5rem 0;
+    padding: 1.5rem;
+    border-radius: 16px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+    margin: 1rem 0;
     border-left: 4px solid #4b6cb7;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    border: 1px solid rgba(0,0,0,0.05);
 }
 
-.footer {
+.transaction-card:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+}
+
+/* Form Styling */
+.form-container {
+    background: white;
+    padding: 2.5rem;
+    border-radius: 20px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+    border: 1px solid rgba(0,0,0,0.05);
+    margin: 2rem 0;
+}
+
+.form-title {
+    color: #2c3e50;
+    font-size: 1.8rem;
+    font-weight: 700;
+    margin-bottom: 2rem;
     text-align: center;
-    color: #666;
-    font-size: 0.9rem;
-    padding: 2rem 0;
-    border-top: 1px solid #e0e0e0;
-    margin-top: 3rem;
 }
 
-/* Progress bar styling */
+.stTextInput, .stTextArea, .stNumberInput, .stSelectbox {
+    margin-bottom: 1.5rem;
+}
+
+.stTextInput > div > div > input,
+.stTextArea > div > div > textarea,
+.stNumberInput > div > div > input,
+.stSelectbox > div > div > div {
+    border: 2px solid #e9ecef;
+    border-radius: 12px;
+    padding: 0.75rem 1rem;
+    font-size: 1rem;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.stTextInput > div > div > input:focus,
+.stTextArea > div > div > textarea:focus,
+.stNumberInput > div > div > input:focus,
+.stSelectbox > div > div > div:focus {
+    border-color: #4b6cb7;
+    box-shadow: 0 0 0 3px rgba(75, 108, 183, 0.1);
+}
+
+.stButton > button {
+    background: linear-gradient(135deg, #4b6cb7 0%, #182848 100%);
+    color: white;
+    border: none;
+    padding: 0.75rem 2rem;
+    border-radius: 12px;
+    font-weight: 600;
+    font-size: 1rem;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 4px 12px rgba(75, 108, 183, 0.3);
+}
+
+.stButton > button:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 6px 20px rgba(75, 108, 183, 0.4);
+}
+
+/* Progress Bar Styling */
 .progress-bar {
-    background: #f0f0f0;
-    border-radius: 10px;
-    height: 10px;
-    margin: 0.5rem 0;
+    background: #f8f9fa;
+    border-radius: 12px;
+    height: 12px;
+    margin: 1rem 0;
     overflow: hidden;
+    border: 1px solid rgba(0,0,0,0.05);
 }
 
 .progress-fill {
     background: linear-gradient(90deg, #4b6cb7, #28a745);
     height: 100%;
-    border-radius: 10px;
-    transition: width 0.3s ease;
+    border-radius: 12px;
+    transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-/* Hide Streamlit elements */
+/* Footer Styling */
+.footer {
+    text-align: center;
+    color: #6c757d;
+    font-size: 0.9rem;
+    padding: 3rem 0;
+    border-top: 1px solid rgba(0,0,0,0.1);
+    margin-top: 4rem;
+    background: white;
+    border-radius: 20px 20px 0 0;
+}
+
+/* Toast Messages */
+.toast-success {
+    background: linear-gradient(135deg, #28a745, #20c997);
+    color: white;
+    padding: 1rem 2rem;
+    border-radius: 12px;
+    margin: 1rem 0;
+    box-shadow: 0 4px 12px rgba(40, 167, 69, 0.3);
+}
+
+.toast-error {
+    background: linear-gradient(135deg, #dc3545, #e74c3c);
+    color: white;
+    padding: 1rem 2rem;
+    border-radius: 12px;
+    margin: 1rem 0;
+    box-shadow: 0 4px 12px rgba(220, 53, 69, 0.3);
+}
+
+.toast-info {
+    background: linear-gradient(135deg, #17a2b8, #3498db);
+    color: white;
+    padding: 1rem 2rem;
+    border-radius: 12px;
+    margin: 1rem 0;
+    box-shadow: 0 4px 12px rgba(23, 162, 184, 0.3);
+}
+
+/* Hide Streamlit Elements */
 [data-testid="stHeader"] {display: none !important;}
 [data-testid="stToolbar"] {display: none !important;}
 #MainMenu {visibility: hidden !important;}
 footer {visibility: hidden !important;}
+div[data-testid="stSidebar"] {display: none !important;}
 
-/* Responsive design */
+/* Responsive Design */
 @media (max-width: 768px) {
     .navbar {
         flex-direction: column;
         gap: 1rem;
+        padding: 1rem;
     }
+
     .nav-links {
         flex-wrap: wrap;
         justify-content: center;
+    }
+
+    .app-header {
+        padding: 1.5rem 1rem;
+    }
+
+    .app-header h1 {
+        font-size: 2rem;
+    }
+
+    .metric-card {
+        padding: 1.5rem;
+        margin: 0.5rem;
+    }
+
+    .metric-card h2 {
+        font-size: 2rem;
+    }
+
+    .campaign-card, .loan-card, .ai-card {
+        padding: 1.5rem;
+        margin: 1rem 0;
+    }
+}
+
+@media (max-width: 480px) {
+    .login-box {
+        padding: 2rem 1.5rem;
+        margin: 1rem;
+    }
+
+    .login-header h1 {
+        font-size: 2rem;
+    }
+
+    .nav-link {
+        padding: 0.5rem 1rem;
+        font-size: 0.9rem;
+    }
+
+    .metric-card h2 {
+        font-size: 1.8rem;
     }
 }
 </style>
 """, unsafe_allow_html=True)
 
+# Authentication Pages
 def show_login_page():
-    """Professional login page"""
+    """Modern login page with professional design"""
     st.markdown("""
     <div class="login-container">
         <div class="login-box">
-            <div style="text-align: center; margin-bottom: 2rem;">
-                <h1 style="color: #2c3e50; margin-bottom: 0.5rem;">🌍 SDG Finance Platform</h1>
-                <p style="color: #666;">Empowering communities through financial inclusion</p>
+            <div class="login-header">
+                <h1>🌍 SDG Finance</h1>
+                <p>Empowering communities through financial inclusion</p>
             </div>
         </div>
     </div>
     """, unsafe_allow_html=True)
 
-    # Login form
     with st.form("login_form"):
-        st.subheader("🔐 Login to Your Account")
+        st.subheader("🔐 Secure Login")
 
-        username = st.text_input("Email/Username", placeholder="Enter your email or username")
+        col1, col2, col3 = st.columns([1, 2, 1])
+        username = st.text_input("Email", placeholder="Enter your email address")
         password = st.text_input("Password", type="password", placeholder="Enter your password")
 
         col1, col2, col3 = st.columns([1, 1, 1])
@@ -270,7 +519,7 @@ def show_login_page():
                 response = requests.post(
                     get_api_url("/auth/login/access-token"),
                     data={
-                        "username": username,
+                        "username": username,  # The backend expects "username" field even for email
                         "password": password
                     },
                     headers={"Content-Type": "application/x-www-form-urlencoded"},
@@ -306,8 +555,91 @@ def show_login_page():
 
     st.markdown("---")
     st.markdown("**Demo Accounts:**")
-    st.markdown("👤 **User:** `user@example.com` / `password123`")
+    st.markdown("👤 **User:** `john@example.com` / `password123`")
+    st.markdown("👤 **User:** `jane@example.com` / `password123`")
     st.markdown("🔧 **Admin:** `admin@example.com` / `admin123`")
+
+    # Registration section
+    st.markdown("---")
+    st.markdown("**New User? Create Account:**")
+    if st.button("📝 Register New Account"):
+        st.session_state.show_register = True
+        st.rerun()
+
+def show_register_page():
+    """Modern registration page with professional design"""
+    st.markdown("""
+    <div class="login-container">
+        <div class="login-box">
+            <div class="login-header">
+                <h1>📝 Join SDG Finance</h1>
+                <p>Create your account to start your financial inclusion journey</p>
+            </div>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    with st.form("register_form"):
+        st.subheader("🔐 Create New Account")
+
+        col1, col2, col3 = st.columns([1, 2, 1])
+
+        # Registration fields
+        with col1:
+            first_name = st.text_input("First Name", placeholder="Enter your first name")
+        with col3:
+            last_name = st.text_input("Last Name", placeholder="Enter your last name")
+
+        email = st.text_input("Email Address", placeholder="Enter your email address")
+        password = st.text_input("Password", type="password", placeholder="Create a strong password")
+        confirm_password = st.text_input("Confirm Password", type="password", placeholder="Confirm your password")
+
+        col1, col2, col3 = st.columns([1, 1, 1])
+        with col2:
+            register_button = st.form_submit_button("Create Account", use_container_width=True)
+
+    if register_button:
+        if not all([first_name, last_name, email, password, confirm_password]):
+            st.error("⚠️ Please fill in all fields")
+        elif password != confirm_password:
+            st.error("⚠️ Passwords do not match")
+        elif len(password) < 6:
+            st.error("⚠️ Password must be at least 6 characters long")
+        else:
+            # Try to register with backend
+            try:
+                response = requests.post(
+                    get_api_url("/auth/register"),
+                    json={
+                        "email": email,
+                        "password": password,
+                        "first_name": first_name,
+                        "last_name": last_name,
+                        "is_active": True,
+                        "is_verified": False
+                    },
+                    headers={"Content-Type": "application/json"},
+                    timeout=10
+                )
+
+                if response.status_code == 200:
+                    st.success("✅ Account created successfully! Please login with your new credentials.")
+                    st.session_state.show_register = False
+                    st.rerun()
+                elif response.status_code == 400:
+                    error_data = response.json()
+                    st.error(f"❌ {error_data.get('detail', 'Registration failed')}")
+                else:
+                    st.error("❌ Registration failed. Please try again.")
+
+            except Exception as e:
+                st.error(f"❌ Connection error: {str(e)}")
+
+    st.markdown("---")
+    st.markdown("**Already have an account?**")
+    if st.button("🔐 Login Instead"):
+        st.session_state.show_register = False
+        st.rerun()
 
 def show_navbar():
     """Professional top navigation bar"""
@@ -363,7 +695,7 @@ def show_dashboard():
     # Fetch user data from backend
     user_data = make_api_request("/users/me")
     transactions_data = make_api_request("/transactions")
-    loans_data = make_api_request("/loans")
+    loans_data = make_api_request("/microloans")
 
     # Calculate metrics
     total_balance = 0
@@ -607,7 +939,7 @@ def show_microloans():
                         "purpose": loan_purpose,
                         "repayment_period": repayment_period
                     }
-                    result = make_api_request("/loans/apply", "POST", data)
+                    result = make_api_request("/microloans/apply", "POST", data)
                     if result:
                         st.success("✅ Loan application submitted successfully!")
                         st.rerun()
@@ -615,7 +947,7 @@ def show_microloans():
                         st.error("❌ Failed to submit loan application")
 
         # Display available loans
-        loans = make_api_request("/loans/available")
+        loans = make_api_request("/microloans")
         if loans and 'loans' in loans:
             for loan in loans['loans']:
                 st.markdown(f"""
@@ -632,7 +964,7 @@ def show_microloans():
 
     with col2:
         st.markdown("### 📊 Loan Statistics")
-        loans_data = make_api_request("/loans")
+        loans_data = make_api_request("/microloans")
         if loans_data and 'loans' in loans_data:
             total_loans = len(loans_data['loans'])
             active_loans = len([l for l in loans_data['loans'] if l.get('status') == 'active'])
@@ -647,7 +979,7 @@ def show_poverty_map():
     st.markdown('<div class="app-header"><h1>🗺️ Poverty Map</h1><p>Interactive visualization of areas needing support</p></div>', unsafe_allow_html=True)
 
     # Get poverty data from backend
-    poverty_data = make_api_request("/poverty/data")
+    poverty_data = make_api_request("/poverty-areas")
 
     if poverty_data and 'regions' in poverty_data:
         st.markdown("### 🌍 Poverty Distribution Map")
@@ -784,7 +1116,7 @@ def show_dashboard():
     # Fetch comprehensive data from backend
     user_data = make_api_request("/users/me")
     transactions_data = make_api_request("/transactions")
-    loans_data = make_api_request("/loans")
+    loans_data = make_api_request("/microloans")
     campaigns_data = make_api_request("/crowdfunding/campaigns")
 
     # Calculate comprehensive metrics
@@ -1020,7 +1352,10 @@ def main():
     """Main application"""
     # Check authentication first
     if not st.session_state.get('authenticated', False):
-        show_login_page()
+        if st.session_state.get('show_register', False):
+            show_register_page()
+        else:
+            show_login_page()
         return
 
     # Show navigation
