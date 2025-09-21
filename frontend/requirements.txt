@@ -38,6 +38,8 @@ mypy>=1.4.1
 streamlit-option-menu>=0.3.6
 streamlit-extras==0.7.8
 streamlit-authenticator>=0.2.1
+folium>=0.14.0
+streamlit-folium>=0.15.0
 
 # Async
 httpx>=0.24.1
