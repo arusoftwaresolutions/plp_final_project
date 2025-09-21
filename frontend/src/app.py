@@ -166,44 +166,6 @@ load_dotenv()
 # Type aliases
 PageFunc = Callable[[], Awaitable[None]]
 
-# Set page config
-try:
-    st.set_page_config(
-        page_title="Financial Inclusion App",
-        page_icon="💰",
-        layout="wide",
-        initial_sidebar_state="collapsed",
-        menu_items={
-            'Get Help': 'https://github.com/yourusername/financial-inclusion-app',
-            'Report a bug': 'https://github.com/yourusername/financial-inclusion-app/issues',
-            'About': """
-            # Financial Inclusion App
-            
-            Empowering communities through financial services.
-            
-            Version: 1.0.0  
-            Last updated: 2023-11-15
-            """
-        }
-    )
-except Exception as e:
-    logger.error(f"Failed to set page config: {e}")
-    st.error("Failed to initialize the application. Please try refreshing the page.")
-    st.stop()
-
-# Import pages
-from pages import (
-    dashboard,
-    ai_recommendations,
-    transactions,
-    crowdfunding,
-    microloans,
-    poverty_map,
-    profile,
-    admin_panel,
-    auth
-)
-
 # Initialize session state with default values
 def init_session_state():
     """Initialize the session state with default values."""
@@ -399,14 +361,15 @@ async def main():
     """Main application function."""
     # Check authentication
     if not st.session_state.get('authenticated', False):
-        # Render login page
-        if 'auth' in PAGE_MODULES:
+        # Render login page using PAGES dictionary
+        if 'Login' in PAGES:
             try:
-                if hasattr(PAGE_MODULES['auth'], 'show'):
-                    if asyncio.iscoroutinefunction(PAGE_MODULES['auth'].show):
-                        await PAGE_MODULES['auth'].show()
+                login_module = PAGES['Login']['module']
+                if hasattr(login_module, 'show'):
+                    if asyncio.iscoroutinefunction(login_module.show):
+                        await login_module.show()
                     else:
-                        PAGE_MODULES['auth'].show()
+                        login_module.show()
                 else:
                     st.error("Auth module has no 'show' method")
             except Exception as e:
