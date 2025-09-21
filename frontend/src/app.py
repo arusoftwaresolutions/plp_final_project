@@ -483,21 +483,29 @@ async def render_page(page_name: str) -> None:
 
 async def main():
     """Main application function."""
-    # Load CSS
-    load_css()
-    
-    # Check authentication
-    if not st.session_state.get('authenticated', False):
-        # Render login page
-        if 'auth' in PAGE_MODULES:
-            if hasattr(PAGE_MODULES['auth'], 'show') and asyncio.iscoroutinefunction(PAGE_MODULES['auth'].show):
-                await PAGE_MODULES['auth'].show()
+    try:
+        # Load CSS
+        load_css()
+        
+        # Check authentication
+        if not st.session_state.get('authenticated', False):
+            # Render login page
+            if 'auth' in PAGE_MODULES:
+                try:
+                    if hasattr(PAGE_MODULES['auth'], 'show'):
+                        if asyncio.iscoroutinefunction(PAGE_MODULES['auth'].show):
+                            await PAGE_MODULES['auth'].show()
+                        else:
+                            PAGE_MODULES['auth'].show()
+                    else:
+                        st.error("Auth module has no 'show' method")
+                except Exception as e:
+                    st.error(f"Error in auth module: {str(e)}")
             else:
-                PAGE_MODULES['auth'].show()
-        else:
-            st.error("Authentication module not found")
-        return
-    
+                st.error("Authentication module not found")
+            return
+    except:
+        pass
     # Get current page
     current_page = st.session_state.get('current_page', 'Dashboard')
     
@@ -569,22 +577,44 @@ async def main():
 
 def run():
     """Run the Streamlit app."""
-    # This is the main entry point for Streamlit
-    asyncio.run(main())
+    try:
+        # This is the main entry point for Streamlit
+        asyncio.run(main())
+    except Exception as e:
+        # Display any unhandled exceptions
+        st.error(f"An error occurred: {str(e)}")
+        st.exception(e)  # This will show the full traceback in the app
 
 if __name__ == "__main__":
-    # This is the simplest and most reliable way to run the app
-    # Just import streamlit and run the app
-    import streamlit as st
+    import sys
+    import asyncio
     
-    # Check if we're already running in Streamlit
-    if hasattr(st, '_is_running_with_streamlit'):
-        # If yes, just run the main function
-        import asyncio
-        asyncio.run(main())
-    else:
-        # If not, print instructions
-        print("Please run this application using Streamlit with the following command:")
-        print("\n    streamlit run app.py\n")
-        print("Or with custom options:")
-        print("\n    streamlit run app.py --server.port=8501 --server.address=0.0.0.0\n")
+    # Check if we're running in Streamlit
+    try:
+        import streamlit as st
+        if hasattr(st, '_is_running_with_streamlit'):
+            # If yes, just run the main function
+            asyncio.run(main())
+        else:
+            # If not, provide instructions
+            print("\n" + "="*60)
+            print("SDG Finance Platform - Streamlit Application")
+            print("="*60)
+            print("\nTo run this application, please use one of the following commands:")
+            print("\nFor development:")
+            print("    streamlit run app.py")
+            print("\nFor production with specific settings:")
+            print("    streamlit run app.py --server.port=8501 --server.address=0.0.0.0")
+            print("\n" + "="*60 + "\n")
+            
+            # Ask if they want to run it with default settings
+            response = input("Would you like to run the app with default settings? (y/n): ")
+            if response.lower() == 'y':
+                import subprocess
+                file_path = str(Path(__file__).resolve())
+                subprocess.run(["streamlit", "run", file_path])
+    except ImportError:
+        print("Error: Streamlit is not installed. Please install it with:")
+        print("    pip install streamlit")
+    except Exception as e:
+        print(f"An error occurred: {str(e)}")

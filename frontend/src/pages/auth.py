@@ -212,4 +212,9 @@ async def show():
             await login_user(login_attempt["email"], login_attempt["password"])
     
     # Show the login page
+    # Since show_login_page is not async, we don't need to await it
     show_login_page()
+    
+    # Add a small delay to ensure the UI updates
+    import time
+    time.sleep(0.1)
