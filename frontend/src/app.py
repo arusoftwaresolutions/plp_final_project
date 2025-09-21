@@ -14,7 +14,7 @@ st.set_page_config(
     page_title="SDG Finance Platform",
     page_icon="🌍",
     layout="wide",
-    initial_sidebar_state="expanded",
+    initial_sidebar_state="collapsed",  # Changed to collapsed to hide sidebar initially
     menu_items={
         'Get Help': None,
         'Report a bug': None,
@@ -34,6 +34,11 @@ st.markdown("""
     max-width: 100%;
     padding-top: 0;
     padding-bottom: 0;
+}
+
+/* Hide sidebar completely when not authenticated */
+.sidebar-hidden [data-testid="stSidebar"] {
+    display: none !important;
 }
 
 /* Fix for responsive columns */
@@ -88,6 +93,44 @@ iframe {
     .st-emotion-cache-1kyxreq > div:last-child {
         width: 100% !important;
     }
+}
+
+/* Login page specific styles */
+.login-container {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    margin: 0;
+    padding: 0;
+}
+
+.login-box {
+    background: white;
+    padding: 3rem;
+    border-radius: 20px;
+    box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+    max-width: 500px;
+    width: 90%;
+    margin: 2rem auto;
+}
+
+.login-header {
+    text-align: center;
+    margin-bottom: 2rem;
+}
+
+.login-header h1 {
+    color: #2c3e50;
+    margin-bottom: 0.5rem;
+    font-size: 2.5rem;
+}
+
+.login-header p {
+    color: #666;
+    font-size: 1.1rem;
+    margin: 0;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -480,17 +523,29 @@ async def main():
     """Main application function."""
     # Check authentication FIRST - before rendering anything else
     if not st.session_state.get('authenticated', False):
-        # Show clean login page without sidebar
+        # Hide sidebar completely during login
         st.markdown("""
-        <div style="min-height: 100vh; display: flex; align-items: center; justify-content: center; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
-            <div style="background: white; padding: 3rem; border-radius: 20px; box-shadow: 0 20px 40px rgba(0,0,0,0.1); max-width: 500px; width: 90%;">
-                <div style="text-align: center; margin-bottom: 2rem;">
-                    <h1 style="color: #2c3e50; margin-bottom: 0.5rem; font-size: 2.5rem;">🌍 SDG Finance Platform</h1>
-                    <p style="color: #666; font-size: 1.1rem; margin: 0;">Empowering communities through financial inclusion</p>
+        <style>
+        [data-testid="stSidebar"] {
+            display: none !important;
+        }
+        </style>
+        """, unsafe_allow_html=True)
+
+        # Show clean login page
+        st.markdown("""
+        <div class="login-container">
+            <div class="login-box">
+                <div class="login-header">
+                    <h1>🌍 SDG Finance Platform</h1>
+                    <p>Empowering communities through financial inclusion</p>
                 </div>
             </div>
         </div>
         """, unsafe_allow_html=True)
+
+        # Add some space for the login form
+        st.markdown("<div style='height: 50px;'></div>", unsafe_allow_html=True)
 
         # Render login page
         if 'auth' in PAGE_MODULES:
@@ -545,7 +600,7 @@ async def main():
             st.error("Authentication module not found")
         return
 
-    # User is authenticated - show main application with sidebar
+    # User is authenticated - show main application
     st.markdown("""
     <style>
     .main-header {
