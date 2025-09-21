@@ -9,99 +9,126 @@ from streamlit_option_menu import option_menu
 import base64
 from pathlib import Path
 
-# Set page config at the top
+# Set page config at the top with CSP headers
 st.set_page_config(
     page_title="SDG Finance Platform",
     page_icon="🌍",
     layout="wide",
-    initial_sidebar_state="expanded"
+    initial_sidebar_state="expanded",
+    # Set CSP header
+    page_headers={
+        "Content-Security-Policy": "default-src 'self' https: 'unsafe-inline' 'unsafe-eval'; "
+                                  "script-src 'self' https: 'unsafe-inline' 'unsafe-eval'; "
+                                  "style-src 'self' https: 'unsafe-inline'; "
+                                  "img-src 'self' https: data:; "
+                                  "font-src 'self' https: data:;"
+    }
 )
 
-# Import components if needed
+# Import components
 try:
     from streamlit.components.v1 import html
 except ImportError:
     from streamlit import components as st_components
     html = st_components.v1.html
 
-# Add security headers
+# Add feature policy and other meta tags
 st.markdown('''
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self' https: 'unsafe-inline' 'unsafe-eval'; script-src 'self' https: 'unsafe-inline' 'unsafe-eval'; style-src 'self' https: 'unsafe-inline'; img-src 'self' https: data:; font-src 'self' https: data:;">
-    <meta http-equiv="Feature-Policy" content="ambient-light-sensor 'none'; battery 'none'; document-domain 'none'; layout-animations 'none'; legacy-image-formats 'none'; oversized-images 'none'; vr 'none'; wake-lock 'none'">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="description" content="SDG Finance Platform">
 ''', unsafe_allow_html=True)
+
+# Initialize main content container
+st.markdown("""
+    <div id="app-container">
+        <!-- App content will be rendered here -->
+    </div>
+""", unsafe_allow_html=True)
 
 # Add Web3 provider handling using components.html
 web3_js = """
 <script>
-// Wrap in IIFE to avoid polluting global scope
-(function() {
-    try {
-        // Store the original ethereum provider if it exists
-        const originalEthereum = window.ethereum;
-        
-        // Create a safe proxy for the ethereum object
-        const ethereumProxy = new Proxy({}, {
-            get: function(target, prop) {
-                // If the property exists on the original ethereum object, return it
-                if (originalEthereum && prop in originalEthereum) {
-                    const value = originalEthereum[prop];
-                    // If it's a function, bind it to the original ethereum object
-                    return typeof value === 'function' ? value.bind(originalEthereum) : value;
+// Wait for the DOM to be fully loaded
+document.addEventListener('DOMContentLoaded', function() {
+    // Wrap in IIFE to avoid polluting global scope
+    (function() {
+        try {
+            // Store the original ethereum provider if it exists
+            const originalEthereum = window.ethereum;
+            
+            // Create a safe proxy for the ethereum object
+            const ethereumProxy = new Proxy({}, {
+                get: function(target, prop) {
+                    // If the property exists on the original ethereum object, return it
+                    if (originalEthereum && prop in originalEthereum) {
+                        const value = originalEthereum[prop];
+                        // If it's a function, bind it to the original ethereum object
+                        return typeof value === 'function' ? value.bind(originalEthereum) : value;
+                    }
+                    return undefined;
+                },
+                set: function(target, prop, value) {
+                    console.log('Attempt to set ethereum property:', prop, value);
+                    // Allow setting properties on the original ethereum object
+                    if (originalEthereum) {
+                        originalEthereum[prop] = value;
+                    }
+                    return true;
                 }
-                return undefined;
-            },
-            set: function(target, prop, value) {
-                console.log('Attempt to set ethereum property:', prop, value);
-                // Allow setting properties on the original ethereum object
-                if (originalEthereum) {
-                    originalEthereum[prop] = value;
-                }
-                return true;
-            }
-        });
+            });
 
-        // Define the ethereum property with our proxy
-        Object.defineProperty(window, 'ethereum', {
-            get: function() {
-                return ethereumProxy;
-            },
-            set: function(value) {
-                console.log('Ethereum provider injection attempt intercepted');
-                return false;
-            },
-            configurable: false,
-            enumerable: true
-        });
+            // Define the ethereum property with our proxy
+            Object.defineProperty(window, 'ethereum', {
+                get: function() {
+                    return ethereumProxy;
+                },
+                set: function(value) {
+                    console.log('Ethereum provider injection attempt intercepted');
+                    return false;
+                },
+                configurable: false,
+                enumerable: true
+            });
 
-        // Log when the page is fully loaded
-        window.addEventListener('load', function() {
-            console.log('Page fully loaded with Web3 provider protection');
-            if (window.ethereum) {
-                console.log('Ethereum provider available:', 
-                    window.ethereum.isMetaMask ? 'MetaMask' : 
-                    window.ethereum.isBybitWallet ? 'Bybit Wallet' : 'Unknown provider');
-            }
-        });
-        
-        // Signal that the script has loaded successfully
-        console.log('Web3 provider protection initialized');
-    } catch (e) {
-        console.error('Error in Web3 provider initialization:', e);
-    }
-})();
+            // Signal that the script has loaded successfully
+            console.log('Web3 provider protection initialized');
+            
+            // Show the app content
+            document.getElementById('app-container').style.display = 'block';
+            
+        } catch (e) {
+            console.error('Error in Web3 provider initialization:', e);
+            // Make sure the app content is visible even if there's an error
+            document.getElementById('app-container').style.display = 'block';
+        }
+    })();
+});
 </script>
 """
 
 # Use components.html to inject the JavaScript
 html(web3_js, height=0, width=0)
 
+# Add some initial content to ensure the page is not empty
+st.title("SDG Finance Platform")
+st.write("Loading application...")
+
 # Custom CSS for modern styling
 def load_css():
     custom_css = """
     <style>
+        /* Ensure the app container is visible */
+        #app-container {
+            display: none; /* Will be shown by JavaScript */
+            min-height: 100vh;
+            background-color: #f8f9fa;
+        }
+        
         /* Main container */
         .main {
             background-color: #f8f9fa;
+            min-height: 100vh;
         }
         
         /* Sidebar */
