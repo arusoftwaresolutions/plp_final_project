@@ -17,6 +17,39 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
+# Add security headers and handle Web3 provider conflicts
+st.markdown("""
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self' https: 'unsafe-inline' 'unsafe-eval'; script-src 'self' https: 'unsafe-inline' 'unsafe-eval'; style-src 'self' https: 'unsafe-inline'; img-src 'self' https: data:; font-src 'self' https: data:;">
+    <meta http-equiv="Feature-Policy" content="ambient-light-sensor 'none'; battery 'none'; document-domain 'none'; layout-animations 'none'; legacy-image-formats 'none'; oversized-images 'none'; vr 'none'; wake-lock 'none'">
+    <script>
+        // Handle Web3 provider conflicts
+        document.addEventListener('DOMContentLoaded', function() {
+            // Check for Bybit wallet
+            if (window.ethereum && window.ethereum.isBybitWallet) {
+                console.log("Bybit Wallet detected");
+                // You can add custom Bybit wallet handling here if needed
+            }
+            
+            // Prevent multiple ethereum provider injections
+            if (window.ethereum && !window.originalEthereum) {
+                window.originalEthereum = window.ethereum;
+                Object.defineProperty(window, 'ethereum', {
+                    get() {
+                        return window.originalEthereum;
+                    },
+                    set(value) {
+                        console.log('Ethereum provider injection attempt:', value);
+                        // You can add custom logic here to handle the new provider
+                        window.originalEthereum = value;
+                    },
+                    configurable: false,
+                    enumerable: true
+                });
+            }
+        });
+    </script>
+""", unsafe_allow_html=True)
+
 # Custom CSS for modern styling
 def load_css():
     custom_css = """
