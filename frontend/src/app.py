@@ -5,15 +5,14 @@ A modern, professional frontend built with Streamlit
 
 import streamlit as st
 import requests
-import json
 import pandas as pd
-from datetime import datetime, timedelta
+import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
-from typing import Dict, List, Optional, Any
-import uuid
+from datetime import datetime, timedelta
+import time
 
-# Try to import folium for better mapping
+# Optional dependencies with fallbacks
 try:
     import folium
     from streamlit_folium import st_folium
@@ -154,46 +153,36 @@ st.markdown("""
     margin: 0;
 }
 
-/* Navigation Bar Styling */
+/* Navigation styles */
 .navbar {
     background: white;
-    padding: 1.5rem 2rem;
-    border-radius: 16px;
-    box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+    padding: 1rem 2rem;
+    border-radius: 10px;
     margin-bottom: 2rem;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
     display: flex;
     justify-content: space-between;
     align-items: center;
-    border: 1px solid rgba(0,0,0,0.05);
+    flex-wrap: wrap;
+    gap: 1rem;
 }
 
-.nav-links {
+.navbar-left {
+    flex-shrink: 0;
+}
+
+.navbar-left h3 {
+    margin: 0;
+    color: #4b6cb7;
+    font-size: 1.5rem;
+}
+
+.navbar-center {
     display: flex;
     gap: 0.5rem;
-    align-items: center;
-}
-
-.nav-link {
-    color: #4b6cb7;
-    text-decoration: none;
-    font-weight: 600;
-    padding: 0.75rem 1.5rem;
-    border-radius: 12px;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    border: 2px solid transparent;
-    background: none;
-    cursor: pointer;
-    font-size: 0.95rem;
-}
-
-.nav-link:hover {
-    background: rgba(75, 108, 183, 0.1);
-    color: #182848;
-    border-color: rgba(75, 108, 183, 0.3);
-    transform: translateY(-1px);
-}
-
-.nav-link.active {
+    flex-wrap: wrap;
+    flex-grow: 1;
+    justify-content: center;
     background: linear-gradient(135deg, #4b6cb7 0%, #182848 100%);
     color: white;
     box-shadow: 0 4px 12px rgba(75, 108, 183, 0.3);
@@ -427,14 +416,87 @@ st.markdown("""
 [data-testid="stToolbar"] {display: none !important;}
 #MainMenu {visibility: hidden !important;}
 footer {visibility: hidden !important;}
-div[data-testid="stSidebar"] {display: none !important;}
+
+[data-testid="stSidebar"] {
+    display: none !important;
+    visibility: hidden !important;
+    width: 0 !important;
+    height: 0 !important;
+}
+
+[data-testid="stSidebarNav"] {
+    display: none !important;
+}
+
+/* Remove sidebar collapse button */
+button[kind="secondary"] {
+    display: none !important;
+}
+
+/* Remove default Streamlit margins and padding */
+.block-container {
+    padding-top: 1rem;
+    padding-bottom: 1rem;
+    max-width: 100%;
+}
+
+.main .block-container {
+    padding-left: 1rem;
+    padding-right: 1rem;
+}
+
+/* Hide any remaining sidebar elements */
+section[data-testid="stSidebar"] {
+    display: none !important;
+}
+
+div[data-testid="stSidebar"] {
+    display: none !important;
+}
+
+/* Ensure main content takes full width */
+.main {
+    width: 100% !important;
+    max-width: 100% !important;
+}
 
 /* Responsive Design */
 @media (max-width: 768px) {
     .navbar {
         flex-direction: column;
         gap: 1rem;
-        padding: 1rem;
+        padding: 1.5rem;
+    }
+
+    .navbar-center button {
+        background: rgba(255, 255, 255, 0.2);
+        border: 1px solid rgba(255, 255, 255, 0.3);
+        border-radius: 25px;
+        padding: 0.5rem 1rem;
+        color: white;
+        font-weight: 500;
+        transition: all 0.3s ease;
+        backdrop-filter: blur(10px);
+    }
+
+    .navbar-center button:hover {
+        background: rgba(255, 255, 255, 0.3);
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+    }
+
+    .navbar-center button.active {
+        background: rgba(255, 255, 255, 0.9);
+        color: #4b6cb7;
+    }
+
+    .user-info {
+        padding: 0.5rem 1rem;
+        background: rgba(255, 255, 255, 0.9);
+        border-radius: 20px;
+        font-size: 0.9rem;
+        color: #4b6cb7;
+        font-weight: 500;
     }
 
     .nav-links {
@@ -653,37 +715,48 @@ def show_navbar():
 
     current_page = st.session_state.get('current_page', 'Dashboard')
 
-    st.markdown(f"""
+    st.markdown("""
     <div class="navbar">
-        <div>
-            <h3 style="margin: 0; color: #4b6cb7;">🌍 SDG Finance Platform</h3>
+        <div class="navbar-left">
+            <h3>🌍 SDG Finance Platform</h3>
         </div>
-        <div class="nav-links">
+        <div class="navbar-center">
     """, unsafe_allow_html=True)
 
-    # Navigation links
-    for page in pages:
-        active_class = 'active' if current_page == page else ''
-        if st.button(page, key=f"nav_{page}", help=f"Go to {page}"):
-            st.session_state.current_page = page
-            st.rerun()
+    # Navigation links - Create horizontal layout
+    nav_cols = st.columns(len(pages) + 2)  # +2 for user info and logout
 
-    # User info and logout
-    user_info = st.session_state.get('current_user', {})
-    username = user_info.get('username', 'User')
-    st.markdown(f"""
-        <span style="margin-left: 1rem; padding: 0.5rem; background: #f0f4ff; border-radius: 20px; font-size: 0.9rem;">
+    # Navigation buttons
+    for i, page in enumerate(pages):
+        with nav_cols[i]:
+            if st.button(
+                page,
+                key=f"nav_{page}",
+                help=f"Go to {page}",
+                use_container_width=True
+            ):
+                st.session_state.current_page = page
+                st.rerun()
+
+    # User info
+    with nav_cols[len(pages)]:
+        user_info = st.session_state.get('current_user', {})
+        username = user_info.get('username', 'User')
+        st.markdown(f"""
+        <div class="user-info">
             👤 {username} {'(Admin)' if st.session_state.get('is_admin', False) else ''}
-        </span>
-    """, unsafe_allow_html=True)
+        </div>
+        """, unsafe_allow_html=True)
 
-    if st.button("🚪 Logout", key="logout"):
-        st.session_state.authenticated = False
-        st.session_state.auth_token = None
-        st.session_state.current_user = None
-        st.session_state.is_admin = False
-        st.success("Logged out successfully!")
-        st.rerun()
+    # Logout button
+    with nav_cols[len(pages) + 1]:
+        if st.button("🚪 Logout", key="logout", use_container_width=True):
+            st.session_state.authenticated = False
+            st.session_state.auth_token = None
+            st.session_state.current_user = None
+            st.session_state.is_admin = False
+            st.success("Logged out successfully!")
+            st.rerun()
 
     st.markdown("</div></div>", unsafe_allow_html=True)
 
@@ -714,7 +787,9 @@ def show_dashboard():
     if loans_data:
         active_loans = len([loan for loan in loans_data.get('loans', []) if loan['status'] == 'active'])
 
-    # Display metrics
+    # Display metrics - Add missing column definitions
+    col1, col2, col3, col4 = st.columns(4)
+
     with col1:
         st.markdown(f'''
         <div class="metric-card">
@@ -1109,187 +1184,9 @@ def show_poverty_map():
     else:
         st.info("🗺️ Poverty data will be displayed here when available from the backend. Please check your backend API connection.")
 
-def show_dashboard():
-    """Enhanced professional dashboard with comprehensive metrics"""
-    st.markdown('<div class="app-header"><h1>📊 Dashboard</h1><p>Comprehensive financial overview and insights</p></div>', unsafe_allow_html=True)
-
-    # Fetch comprehensive data from backend
-    user_data = make_api_request("/users/me")
-    transactions_data = make_api_request("/transactions")
-    loans_data = make_api_request("/microloans")
-    campaigns_data = make_api_request("/crowdfunding/campaigns")
-
-    # Calculate comprehensive metrics
-    total_balance = 0
-    total_expenses = 0
-    total_income = 0
-    active_loans = 0
-    total_loans_amount = 0
-    active_campaigns = 0
-    total_campaigns_raised = 0
-
-    if transactions_data and 'transactions' in transactions_data:
-        for trans in transactions_data.get('transactions', []):
-            if trans.get('type') == 'income':
-                total_income += trans.get('amount', 0)
-            else:
-                total_expenses += trans.get('amount', 0)
-        total_balance = total_income - total_expenses
-
-    if loans_data and 'loans' in loans_data:
-        loans = loans_data.get('loans', [])
-        active_loans = len([loan for loan in loans if loan.get('status') == 'active'])
-        total_loans_amount = sum(loan.get('amount', 0) for loan in loans)
-
-    if campaigns_data and 'campaigns' in campaigns_data:
-        campaigns = campaigns_data.get('campaigns', [])
-        active_campaigns = len([c for c in campaigns if c.get('status') == 'active'])
-        total_campaigns_raised = sum(c.get('raised_amount', 0) for c in campaigns)
-
-    # Display comprehensive metrics
-    col1, col2, col3, col4 = st.columns(4)
-
-    with col1:
-        st.markdown(f'''
-        <div class="metric-card">
-            <h3>💰 Total Balance</h3>
-            <h2 style="color: {"#28a745" if total_balance > 0 else "#dc3545"};">${total_balance:,.2f}</h2>
-        </div>
-        ''', unsafe_allow_html=True)
-
-    with col2:
-        st.markdown(f'''
-        <div class="metric-card">
-            <h3>📈 Monthly Income</h3>
-            <h2>${total_income:,.2f}</h2>
-        </div>
-        ''', unsafe_allow_html=True)
-
-    with col3:
-        st.markdown(f'''
-        <div class="metric-card">
-            <h3>📉 Monthly Expenses</h3>
-            <h2>${total_expenses:,.2f}</h2>
-        </div>
-        ''', unsafe_allow_html=True)
-
-    with col4:
-        st.markdown(f'''
-        <div class="metric-card">
-            <h3>🏦 Active Loans</h3>
-            <h2>{active_loans}</h2>
-        </div>
-        ''', unsafe_allow_html=True)
-
-    # Additional metrics row
-    col5, col6, col7, col8 = st.columns(4)
-
-    with col5:
-        st.markdown(f'''
-        <div class="metric-card">
-            <h3>🎯 Loan Portfolio</h3>
-            <h2>${total_loans_amount:,.2f}</h2>
-        </div>
-        ''', unsafe_allow_html=True)
-
-    with col6:
-        st.markdown(f'''
-        <div class="metric-card">
-            <h3>🤝 Active Campaigns</h3>
-            <h2>{active_campaigns}</h2>
-        </div>
-        ''', unsafe_allow_html=True)
-
-    with col7:
-        st.markdown(f'''
-        <div class="metric-card">
-            <h3>💚 Community Impact</h3>
-            <h2>${total_campaigns_raised:,.2f}</h2>
-        </div>
-        ''', unsafe_allow_html=True)
-
-    with col8:
-        st.markdown(f'''
-        <div class="metric-card">
-            <h3>⭐ Financial Health</h3>
-            <h2 style="color: {"#28a745" if total_balance > total_expenses else "#ffc107"};">
-                {"Good" if total_balance > total_expenses else "Review"}
-            </h2>
-        </div>
-        ''', unsafe_allow_html=True)
-
-    # Enhanced charts section
-    st.markdown("### 📊 Advanced Analytics")
-
-    chart_col1, chart_col2 = st.columns(2)
-
-    with chart_col1:
-        st.markdown("#### 💹 Income vs Expenses Trend")
-        if transactions_data and 'transactions' in transactions_data:
-            df = pd.DataFrame(transactions_data.get('transactions', []))
-            if not df.empty:
-                df['date'] = pd.to_datetime(df['created_at'])
-                monthly_data = df.groupby([df['date'].dt.to_period('M'), 'type'])['amount'].sum().unstack().fillna(0)
-
-                fig = go.Figure()
-                fig.add_trace(go.Bar(name='Income', x=monthly_data.index.astype(str), y=monthly_data.get('income', 0), marker_color='#28a745'))
-                fig.add_trace(go.Bar(name='Expenses', x=monthly_data.index.astype(str), y=monthly_data.get('expense', 0), marker_color='#dc3545'))
-                fig.update_layout(
-                    title="Monthly Financial Flow",
-                    barmode='group',
-                    plot_bgcolor='rgba(0,0,0,0)',
-                    paper_bgcolor='rgba(0,0,0,0)'
-                )
-                st.plotly_chart(fig, use_container_width=True)
-
-    with chart_col2:
-        st.markdown("#### 🥧 Expense Categories")
-        if transactions_data and 'transactions' in transactions_data:
-            df = pd.DataFrame(transactions_data.get('transactions', []))
-            if not df.empty and 'category' in df.columns:
-                category_data = df[df['type'] == 'expense'].groupby('category')['amount'].sum()
-                if not category_data.empty:
-                    fig = px.pie(
-                        values=category_data.values,
-                        names=category_data.index,
-                        title="Expense Distribution",
-                        color_discrete_sequence=px.colors.qualitative.Set3
-                    )
-                    fig.update_traces(textposition='inside', textinfo='percent+label')
-                    fig.update_layout(
-                        plot_bgcolor='rgba(0,0,0,0)',
-                        paper_bgcolor='rgba(0,0,0,0)'
-                    )
-                    st.plotly_chart(fig, use_container_width=True)
-
-    # Quick actions section
-    st.markdown("### ⚡ Quick Actions")
-
-    action_col1, action_col2, action_col3, action_col4 = st.columns(4)
-
-    with action_col1:
-        if st.button("💳 Add Transaction", use_container_width=True):
-            st.session_state.current_page = "Transactions"
-            st.rerun()
-
-    with action_col2:
-        if st.button("🤝 View Campaigns", use_container_width=True):
-            st.session_state.current_page = "Crowdfunding"
-            st.rerun()
-
-    with action_col3:
-        if st.button("🏦 Apply for Loan", use_container_width=True):
-            st.session_state.current_page = "Microloans"
-            st.rerun()
-
-    with action_col4:
-        if st.button("👤 Update Profile", use_container_width=True):
-            st.session_state.current_page = "Profile"
-            st.rerun()
-
-def show_profile():
-    """User profile with real data"""
-    st.markdown('<div class="app-header"><h1>👤 Profile</h1><p>Manage your account settings</p></div>', unsafe_allow_html=True)
+def show_ai_recommendations():
+    """AI Recommendations page with real data"""
+    st.markdown('<div class="app-header"><h1>🤖 AI Recommendations</h1><p>Personalized suggestions for your financial growth</p></div>', unsafe_allow_html=True)
 
     # Get user profile from backend
     user_profile = make_api_request("/users/me")
