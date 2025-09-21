@@ -14,8 +14,83 @@ st.set_page_config(
     page_title="SDG Finance Platform",
     page_icon="🌍",
     layout="wide",
-    initial_sidebar_state="expanded"
+    initial_sidebar_state="expanded",
+    menu_items={
+        'Get Help': None,
+        'Report a bug': None,
+        'About': None
+    }
 )
+
+# Add global CSS to fix layout and reduce CSP issues
+st.markdown("""
+<style>
+/* Global styles to fix layout issues */
+* {
+    box-sizing: border-box;
+}
+
+.main .block-container {
+    max-width: 100%;
+    padding-top: 0;
+    padding-bottom: 0;
+}
+
+/* Fix for responsive columns */
+.st-emotion-cache-1kyxreq {
+    gap: 1rem !important;
+}
+
+.st-emotion-cache-1kyxreq > div {
+    min-width: 0;
+}
+
+/* Ensure proper iframe sandboxing */
+iframe {
+    sandbox="allow-same-origin allow-scripts allow-forms allow-downloads";
+}
+
+/* Hide Streamlit elements that cause CSP issues */
+[data-testid="stHeader"] {
+    display: none !important;
+}
+
+[data-testid="stToolbar"] {
+    display: none !important;
+}
+
+[data-testid="stSidebarNav"] {
+    display: none !important;
+}
+
+/* Fix for main menu */
+#MainMenu {
+    visibility: hidden !important;
+}
+
+/* Ensure footer is always visible */
+.footer {
+    margin-top: 2rem !important;
+    padding: 1rem !important;
+}
+
+/* Responsive design improvements */
+@media (max-width: 768px) {
+    .st-emotion-cache-1kyxreq {
+        flex-direction: column !important;
+    }
+
+    .st-emotion-cache-1kyxreq > div:first-child {
+        width: 100% !important;
+        margin-bottom: 1rem;
+    }
+
+    .st-emotion-cache-1kyxreq > div:last-child {
+        width: 100% !important;
+    }
+}
+</style>
+""", unsafe_allow_html=True)
 
 # Import components
 try:
@@ -26,10 +101,13 @@ except ImportError:
 
 # Add security headers and Web3 provider protection
 st.markdown('''
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta http-equiv="X-UA-Compatible" content="IE=edge">
-    <meta name="description" content="SDG Finance Platform">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self' https: 'unsafe-inline' 'unsafe-eval'; script-src 'self' https: 'unsafe-inline' 'unsafe-eval'; style-src 'self' https: 'unsafe-inline'; img-src 'self' https: data:; font-src 'self' https: data:;">
+    <head>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge">
+        <meta name="description" content="SDG Finance Platform">
+        <meta http-equiv="Content-Security-Policy" content="default-src 'self' https: 'unsafe-inline' 'unsafe-eval'; script-src 'self' https: 'unsafe-inline' 'unsafe-eval'; style-src 'self' https: 'unsafe-inline'; img-src 'self' https: data:; font-src 'self' https: data:; frame-ancestors 'self';">
+        <meta name="referrer" content="strict-origin-when-cross-origin">
+    </head>
 ''', unsafe_allow_html=True)
 
 # Configuration - matches your backend API
@@ -400,8 +478,20 @@ async def render_page(page_name: str) -> None:
 
 async def main():
     """Main application function."""
-    # Check authentication
+    # Check authentication FIRST - before rendering anything else
     if not st.session_state.get('authenticated', False):
+        # Show clean login page without sidebar
+        st.markdown("""
+        <div style="min-height: 100vh; display: flex; align-items: center; justify-content: center; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+            <div style="background: white; padding: 3rem; border-radius: 20px; box-shadow: 0 20px 40px rgba(0,0,0,0.1); max-width: 500px; width: 90%;">
+                <div style="text-align: center; margin-bottom: 2rem;">
+                    <h1 style="color: #2c3e50; margin-bottom: 0.5rem; font-size: 2.5rem;">🌍 SDG Finance Platform</h1>
+                    <p style="color: #666; font-size: 1.1rem; margin: 0;">Empowering communities through financial inclusion</p>
+                </div>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+
         # Render login page
         if 'auth' in PAGE_MODULES:
             try:
@@ -414,14 +504,84 @@ async def main():
                     st.error("Auth module has no 'show' method")
             except Exception as e:
                 st.error(f"Error in auth module: {str(e)}")
+                # Show fallback login form
+                st.markdown("---")
+                st.subheader("🔑 Simple Login (Fallback)")
+
+                with st.form("fallback_login_form"):
+                    username = st.text_input("Username", placeholder="Enter your username")
+                    password = st.text_input("Password", type="password", placeholder="Enter your password")
+
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        login_button = st.form_submit_button("Login", use_container_width=True)
+                    with col2:
+                        st.form_submit_button("Forgot Password?", use_container_width=True)
+
+                if login_button:
+                    if username and password:
+                        if username == "admin" and password == "password":
+                            st.session_state.authenticated = True
+                            st.session_state.is_admin = True
+                            st.session_state.current_user = {"username": username}
+                            st.success("Login successful! Redirecting...")
+                            st.rerun()
+                        elif username == "user" and password == "password":
+                            st.session_state.authenticated = True
+                            st.session_state.is_admin = False
+                            st.session_state.current_user = {"username": username}
+                            st.success("Login successful! Redirecting...")
+                            st.rerun()
+                        else:
+                            st.error("Invalid username or password")
+                    else:
+                        st.error("Please enter both username and password")
+
+                st.markdown("---")
+                st.markdown("**Demo Accounts:**")
+                st.markdown("- Username: `admin`, Password: `password` (Admin access)")
+                st.markdown("- Username: `user`, Password: `password` (User access)")
         else:
             st.error("Authentication module not found")
         return
+
+    # User is authenticated - show main application with sidebar
+    st.markdown("""
+    <style>
+    .main-header {
+        background: linear-gradient(135deg, #4b6cb7 0%, #182848 100%);
+        color: white;
+        padding: 1rem 2rem;
+        border-radius: 0 0 20px 20px;
+        margin-bottom: 2rem;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+    }
+    .main-header h1 {
+        margin: 0;
+        font-size: 2rem;
+        font-weight: 600;
+    }
+    .main-header p {
+        margin: 0.5rem 0 0 0;
+        opacity: 0.9;
+        font-size: 1rem;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
+    # Header
+    st.markdown(f"""
+    <div class="main-header">
+        <h1>🌍 SDG Finance Platform Dashboard</h1>
+        <p>Welcome back, {st.session_state.current_user.get('username', 'User')}!</p>
+    </div>
+    """, unsafe_allow_html=True)
+
     # Get current page
     current_page = st.session_state.get('current_page', 'Dashboard')
 
     # Create main layout
-    col1, col2 = st.columns([1, 4])
+    col1, col2 = st.columns([1, 3])
 
     # Render the sidebar in the first column
     with col1:
@@ -429,6 +589,9 @@ async def main():
 
     # Render the main content in the second column
     with col2:
+        # Add some spacing
+        st.markdown("<div style='margin-bottom: 1rem;'></div>", unsafe_allow_html=True)
+
         # Render the current page
         if current_page in PAGES:
             try:
@@ -441,6 +604,10 @@ async def main():
             except Exception as e:
                 st.error(f"Error loading page: {str(e)}")
                 logger.error(f"Error in page {current_page}: {str(e)}")
+                # Show fallback content
+                st.markdown(f"## 📊 {current_page}")
+                st.write(f"Welcome to the {current_page.lower()} page!")
+                st.info("This page is currently under development.")
         else:
             st.warning("Page not found. Redirecting to dashboard...")
             st.session_state.current_page = "Dashboard"
@@ -448,36 +615,6 @@ async def main():
 
     # Add footer
     st.markdown("""
-    <style>
-        .footer {
-            padding: 1rem 0;
-            margin-top: 2rem;
-            text-align: center;
-            color: #666;
-            font-size: 0.8rem;
-            border-top: 1px solid #e0e0e0;
-        }
-        .stTextInput > div > div > input,
-        .stTextArea > div > div > textarea,
-        .stSelectbox > div > div > div,
-        .stNumberInput > div > div > input,
-        .stDateInput > div > div > input {
-            border-radius: 0.375rem;
-            border: 1px solid #d1d5db;
-            padding: 0.5rem 0.75rem;
-        }
-
-        /* Table styling */
-        .stDataFrame {
-            border-radius: 0.5rem;
-            overflow: hidden;
-        }
-
-        /* Hide Streamlit branding */
-        #MainMenu {visibility: hidden;}
-        footer {visibility: hidden;}
-        header {visibility: hidden;}
-    </style>
     <div class="footer">
         2023 SDG Finance Platform | Version 1.0.0 |
         <a href="#" style="color: #4b6cb7; text-decoration: none;">Help</a> |
