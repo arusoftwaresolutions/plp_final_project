@@ -9,7 +9,7 @@ from streamlit_option_menu import option_menu
 import base64
 from pathlib import Path
 
-# Set page config at the top with CSP headers
+# Set page config at the top
 st.set_page_config(
     page_title="SDG Finance Platform",
     page_icon="🌍",
@@ -24,7 +24,7 @@ except ImportError:
     from streamlit import components as st_components
     html = st_components.v1.html
 
-# Add feature policy and other meta tags
+# Add security headers and Web3 provider protection
 st.markdown('''
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
@@ -32,46 +32,42 @@ st.markdown('''
     <meta http-equiv="Content-Security-Policy" content="default-src 'self' https: 'unsafe-inline' 'unsafe-eval'; script-src 'self' https: 'unsafe-inline' 'unsafe-eval'; style-src 'self' https: 'unsafe-inline'; img-src 'self' https: data:; font-src 'self' https: data:;">
 ''', unsafe_allow_html=True)
 
-# Initialize main content container
+# Show immediate content
 st.markdown("""
-    <div id="app-container">
-        <!-- App content will be rendered here -->
+    <div id="app-container" style="min-height: 100vh; background-color: #f8f9fa; display: block;">
+        <div id="main-content" style="padding: 2rem; text-align: center; background-color: #ffffff; margin: 2rem auto; max-width: 800px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+            <h1 style="color: #2c3e50; margin-bottom: 1rem; font-size: 2.5rem;">SDG Finance Platform</h1>
+            <p style="color: #666; font-size: 1.2rem;">Loading application...</p>
+            <div id="loading-spinner" style="margin: 2rem 0;">
+                <div style="border: 4px solid #f3f3f3; border-top: 4px solid #3498db; border-radius: 50%; width: 40px; height: 40px; animation: spin 2s linear infinite; margin: 0 auto;"></div>
+            </div>
+            <style>
+                @keyframes spin {
+                    0% { transform: rotate(0deg); }
+                    100% { transform: rotate(360deg); }
+                }
+            </style>
+        </div>
     </div>
 """, unsafe_allow_html=True)
 
-# Add some initial content to ensure the page is not empty
-st.markdown("""
-    <div id="main-content">
-        <h1>SDG Finance Platform</h1>
-        <p>Loading application...</p>
-    </div>
-""", unsafe_allow_html=True)
-
-# Add Web3 provider handling using components.html
+# Add Web3 provider protection JavaScript
 web3_js = """
 <script>
-// Wait for the DOM to be fully loaded
+// Web3 provider protection
 document.addEventListener('DOMContentLoaded', function() {
-    // Wrap in IIFE to avoid polluting global scope
     (function() {
         try {
-            // Store the original ethereum provider if it exists
             const originalEthereum = window.ethereum;
-            
-            // Create a safe proxy for the ethereum object
             const ethereumProxy = new Proxy({}, {
                 get: function(target, prop) {
-                    // If the property exists on the original ethereum object, return it
                     if (originalEthereum && prop in originalEthereum) {
                         const value = originalEthereum[prop];
-                        // If it's a function, bind it to the original ethereum object
                         return typeof value === 'function' ? value.bind(originalEthereum) : value;
                     }
                     return undefined;
                 },
                 set: function(target, prop, value) {
-                    console.log('Attempt to set ethereum property:', prop, value);
-                    // Allow setting properties on the original ethereum object
                     if (originalEthereum) {
                         originalEthereum[prop] = value;
                     }
@@ -79,35 +75,16 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             });
 
-            // Define the ethereum property with our proxy
             Object.defineProperty(window, 'ethereum', {
-                get: function() {
-                    return ethereumProxy;
-                },
-                set: function(value) {
-                    console.log('Ethereum provider injection attempt intercepted');
-                    return false;
-                },
+                get: function() { return ethereumProxy; },
+                set: function(value) { return false; },
                 configurable: false,
                 enumerable: true
             });
 
-            // Signal that the script has loaded successfully
             console.log('Web3 provider protection initialized');
-            
-            // Show the app content (optional - may not be needed if container exists)
-            const appContainer = document.getElementById('app-container');
-            if (appContainer) {
-                appContainer.style.display = 'block';
-            }
-            
         } catch (e) {
-            console.error('Error in Web3 provider initialization:', e);
-            // Make sure the app content is visible even if there's an error
-            const appContainer = document.getElementById('app-container');
-            if (appContainer) {
-                appContainer.style.display = 'block';
-            }
+            console.error('Web3 provider error:', e);
         }
     })();
 });
@@ -117,140 +94,9 @@ document.addEventListener('DOMContentLoaded', function() {
 # Use components.html to inject the JavaScript
 html(web3_js, height=0, width=0)
 
-# Custom CSS for modern styling
-def load_css():
-    custom_css = """
-    <style>
-        /* Ensure the app container is visible */
-        #app-container {
-            display: block; /* Always visible */
-            min-height: 100vh;
-            background-color: #f8f9fa;
-        }
-
-        #main-content {
-            padding: 2rem;
-            text-align: center;
-            background-color: #ffffff;
-            margin: 2rem auto;
-            max-width: 800px;
-            border-radius: 10px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-        }
-
-        #main-content h1 {
-            color: #2c3e50;
-            margin-bottom: 1rem;
-            font-size: 2.5rem;
-        }
-
-        #main-content p {
-            color: #666;
-            font-size: 1.2rem;
-        }
-
-        /* Main container */
-        .main {
-            background-color: #f8f9fa;
-            min-height: 100vh;
-        }
-        
-        /* Sidebar */
-        [data-testid="stSidebar"] {
-            background: linear-gradient(180deg, #2c3e50 0%, #1a2530 100%);
-            color: white;
-            padding: 1rem 0.5rem;
-        }
-        
-        /* Sidebar header */
-        [data-testid="stSidebarNav"]::before {
-            content: "SDG Finance";
-            display: block;
-            font-size: 1.5rem;
-            font-weight: 700;
-            color: #fff;
-            padding: 1rem 1rem 2rem 1rem;
-            text-align: center;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-            margin-bottom: 1rem;
-        }
-        
-        /* Menu items */
-        .st-bb {
-            background-color: transparent !important;
-        }
-        
-        .st-bb:hover {
-            background-color: rgba(255, 255, 255, 0.1) !important;
-        }
-        
-        /* Cards */
-        .card {
-            background: white;
-            border-radius: 10px;
-            padding: 1.5rem;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
-            margin-bottom: 1.5rem;
-            transition: transform 0.2s, box-shadow 0.2s;
-        }
-        
-        .card:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.1);
-        }
-        
-        /* Buttons */
-        .stButton>button {
-            border-radius: 20px;
-            border: none;
-            background: linear-gradient(90deg, #4b6cb7 0%, #182848 100%);
-            color: white;
-            font-weight: 500;
-            padding: 0.5rem 1.5rem;
-            transition: all 0.3s ease;
-        }
-        
-        .stButton>button:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-        }
-        
-        /* Input fields */
-        .stTextInput>div>div>input {
-            border-radius: 8px;
-            border: 1px solid #e0e0e0;
-            padding: 0.5rem 1rem;
-        }
-        
-        /* Tables */
-        .stDataFrame {
-            border-radius: 8px;
-            overflow: hidden;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
-        }
-        
-        /* Tabs */
-        .stTabs [data-baseweb="tab-list"] {
-            gap: 0.5rem;
-        }
-        
-        .stTabs [data-baseweb="tab"] {
-            border-radius: 8px 8px 0 0 !important;
-            padding: 0.5rem 1.5rem;
-            transition: all 0.3s ease;
-        }
-        
-        .stTabs [aria-selected="true"] {
-            background-color: #4b6cb7;
-            color: white !important;
-        }
-    </style>
-    """
-    st.markdown(custom_css, unsafe_allow_html=True)
-
 # Configure logging
 logging.basicConfig(
-    level=logging.INFO,
+    level=logging.DEBUG,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     handlers=[
         logging.StreamHandler(sys.stdout)
@@ -344,67 +190,6 @@ except Exception as e:
     logger.error(f"Failed to set page config: {e}")
     st.error("Failed to initialize the application. Please try refreshing the page.")
     st.stop()
-
-# Custom CSS to hide Streamlit elements and add custom styles
-st.markdown("""
-    <style>
-        /* Hide Streamlit default elements */
-        #MainMenu {visibility: hidden;}
-        footer {visibility: hidden;}
-        header {visibility: hidden;}
-        
-        /* Custom styles */
-        .main {
-            padding: 1rem 2rem;
-        }
-        
-        .card {
-            background: white;
-            border-radius: 10px;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-            padding: 1.5rem;
-            margin-bottom: 1.5rem;
-        }
-        
-        .navbar {
-            background: #2563eb;
-            color: white;
-            padding: 1rem 2rem;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 2rem;
-            border-radius: 0 0 10px 10px;
-        }
-        
-        .logo {
-            font-size: 1.5rem;
-            font-weight: bold;
-        }
-        
-        .nav-links {
-            display: flex;
-            gap: 1.5rem;
-        }
-        
-        .nav-link {
-            color: white;
-            text-decoration: none;
-            font-weight: 500;
-            padding: 0.5rem 1rem;
-            border-radius: 5px;
-            transition: background 0.3s;
-        }
-        
-        .nav-link:hover {
-            background: rgba(255, 255, 255, 0.1);
-        }
-        
-        .nav-link.active {
-            background: rgba(255, 255, 255, 0.2);
-        }
-    </style>
-""", unsafe_allow_html=True)
 
 # Import pages
 from pages import (
@@ -612,29 +397,23 @@ async def render_page(page_name: str) -> None:
 
 async def main():
     """Main application function."""
-    try:
-        # Load CSS
-        load_css()
-        
-        # Check authentication
-        if not st.session_state.get('authenticated', False):
-            # Render login page
-            if 'auth' in PAGE_MODULES:
-                try:
-                    if hasattr(PAGE_MODULES['auth'], 'show'):
-                        if asyncio.iscoroutinefunction(PAGE_MODULES['auth'].show):
-                            await PAGE_MODULES['auth'].show()
-                        else:
-                            PAGE_MODULES['auth'].show()
+    # Check authentication
+    if not st.session_state.get('authenticated', False):
+        # Render login page
+        if 'auth' in PAGE_MODULES:
+            try:
+                if hasattr(PAGE_MODULES['auth'], 'show'):
+                    if asyncio.iscoroutinefunction(PAGE_MODULES['auth'].show):
+                        await PAGE_MODULES['auth'].show()
                     else:
-                        st.error("Auth module has no 'show' method")
-                except Exception as e:
-                    st.error(f"Error in auth module: {str(e)}")
-            else:
-                st.error("Authentication module not found")
-            return
-    except:
-        pass
+                        PAGE_MODULES['auth'].show()
+                else:
+                    st.error("Auth module has no 'show' method")
+            except Exception as e:
+                st.error(f"Error in auth module: {str(e)}")
+        else:
+            st.error("Authentication module not found")
+        return
     # Get current page
     current_page = st.session_state.get('current_page', 'Dashboard')
     
