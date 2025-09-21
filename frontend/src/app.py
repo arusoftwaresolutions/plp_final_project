@@ -39,6 +39,14 @@ st.markdown("""
     </div>
 """, unsafe_allow_html=True)
 
+# Add some initial content to ensure the page is not empty
+st.markdown("""
+    <div id="main-content">
+        <h1>SDG Finance Platform</h1>
+        <p>Loading application...</p>
+    </div>
+""", unsafe_allow_html=True)
+
 # Add Web3 provider handling using components.html
 web3_js = """
 <script>
@@ -87,13 +95,19 @@ document.addEventListener('DOMContentLoaded', function() {
             // Signal that the script has loaded successfully
             console.log('Web3 provider protection initialized');
             
-            // Show the app content
-            document.getElementById('app-container').style.display = 'block';
+            // Show the app content (optional - may not be needed if container exists)
+            const appContainer = document.getElementById('app-container');
+            if (appContainer) {
+                appContainer.style.display = 'block';
+            }
             
         } catch (e) {
             console.error('Error in Web3 provider initialization:', e);
             // Make sure the app content is visible even if there's an error
-            document.getElementById('app-container').style.display = 'block';
+            const appContainer = document.getElementById('app-container');
+            if (appContainer) {
+                appContainer.style.display = 'block';
+            }
         }
     })();
 });
@@ -103,21 +117,38 @@ document.addEventListener('DOMContentLoaded', function() {
 # Use components.html to inject the JavaScript
 html(web3_js, height=0, width=0)
 
-# Add some initial content to ensure the page is not empty
-st.title("SDG Finance Platform")
-st.write("Loading application...")
-
 # Custom CSS for modern styling
 def load_css():
     custom_css = """
     <style>
         /* Ensure the app container is visible */
         #app-container {
-            display: none; /* Will be shown by JavaScript */
+            display: block; /* Always visible */
             min-height: 100vh;
             background-color: #f8f9fa;
         }
-        
+
+        #main-content {
+            padding: 2rem;
+            text-align: center;
+            background-color: #ffffff;
+            margin: 2rem auto;
+            max-width: 800px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        #main-content h1 {
+            color: #2c3e50;
+            margin-bottom: 1rem;
+            font-size: 2.5rem;
+        }
+
+        #main-content p {
+            color: #666;
+            font-size: 1.2rem;
+        }
+
         /* Main container */
         .main {
             background-color: #f8f9fa;
