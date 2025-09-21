@@ -32,26 +32,12 @@ st.markdown('''
     <meta http-equiv="Content-Security-Policy" content="default-src 'self' https: 'unsafe-inline' 'unsafe-eval'; script-src 'self' https: 'unsafe-inline' 'unsafe-eval'; style-src 'self' https: 'unsafe-inline'; img-src 'self' https: data:; font-src 'self' https: data:;">
 ''', unsafe_allow_html=True)
 
-# Show immediate content
-st.markdown("""
-    <div id="app-container" style="min-height: 100vh; background-color: #f8f9fa; display: block;">
-        <div id="main-content" style="padding: 2rem; text-align: center; background-color: #ffffff; margin: 2rem auto; max-width: 800px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
-            <h1 style="color: #2c3e50; margin-bottom: 1rem; font-size: 2.5rem;">SDG Finance Platform</h1>
-            <p style="color: #666; font-size: 1.2rem;">Loading application...</p>
-            <div id="loading-spinner" style="margin: 2rem 0;">
-                <div style="border: 4px solid #f3f3f3; border-top: 4px solid #3498db; border-radius: 50%; width: 40px; height: 40px; animation: spin 2s linear infinite; margin: 0 auto;"></div>
-            </div>
-            <style>
-                @keyframes spin {
-                    0% { transform: rotate(0deg); }
-                    100% { transform: rotate(360deg); }
-                }
-            </style>
-        </div>
-    </div>
-""", unsafe_allow_html=True)
+# Configuration - matches your backend API
+API_BASE_URL = os.getenv("API_BASE_URL", "https://plp-final-project-bgex.onrender.com")
+API_PREFIX = os.getenv("API_PREFIX", "/api/v1").strip('/')
+FULL_API_URL = f"{API_BASE_URL.rstrip('/')}/{API_PREFIX}"
 
-# Add Web3 provider protection JavaScript
+# Web3 provider protection JavaScript
 web3_js = """
 <script>
 // Web3 provider protection
@@ -98,9 +84,7 @@ html(web3_js, height=0, width=0)
 logging.basicConfig(
     level=logging.DEBUG,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.StreamHandler(sys.stdout)
-    ]
+    handlers=[logging.StreamHandler(sys.stdout)]
 )
 logger = logging.getLogger(__name__)
 
@@ -142,7 +126,7 @@ try:
         admin_panel,
         auth
     )
-    
+
     PAGE_MODULES = {
         "dashboard": dashboard,
         "ai_recommendations": ai_recommendations,
@@ -154,7 +138,7 @@ try:
         "admin_panel": admin_panel,
         "auth": auth
     }
-    
+
 except ImportError as e:
     logger.error(f"Failed to import page modules: {e}")
     st.error("Failed to load application modules. Please check the logs.")
@@ -199,7 +183,7 @@ def init_session_state():
         },
         'data': {}
     }
-    
+
     # Only set defaults if they don't exist
     for key, value in defaults.items():
         if key not in st.session_state:
@@ -211,6 +195,7 @@ init_session_state()
 # Set default page if not set
 if 'page' not in st.session_state:
     st.session_state.page = 'dashboard'
+
 PAGES: Dict[str, Dict[str, Any]] = {
     "Dashboard": {
         "module": dashboard,
@@ -290,10 +275,66 @@ NAV_CATEGORIES = {
 
 # Initialize session state
 if 'authenticated' not in st.session_state:
-    st.session_state.authenticated = False
-    st.session_state.is_admin = False
     st.session_state.current_user = None
     st.session_state.current_page = "Dashboard"
+
+def render_sidebar():
+    """Render the sidebar navigation."""
+    st.markdown("""
+    <div style="padding: 1rem; background-color: #f8f9fa; border-radius: 10px; margin-bottom: 1rem;">
+        <h3 style="color: #2c3e50; margin-bottom: 1rem; text-align: center;">🌍 SDG Finance Platform</h3>
+        <p style="color: #666; font-size: 0.9rem; text-align: center; margin-bottom: 1rem;">Empowering communities through financial inclusion</p>
+    </div>
+    """, unsafe_allow_html=True)
+
+    # Navigation menu using option_menu
+    selected = option_menu(
+        menu_title=None,
+        options=["Dashboard", "AI Recommendations", "Transactions", "Crowdfunding", "Microloans", "Poverty Map", "Profile"],
+        icons=["speedometer2", "robot", "cash-stack", "people-fill", "piggy-bank", "geo-alt", "person-circle"],
+        menu_icon="cast",
+        default_index=0,
+        orientation="vertical",
+        styles={
+            "container": {"padding": "0!important", "background-color": "#f8f9fa"},
+            "icon": {"color": "#4b6cb7", "font-size": "18px"},
+            "nav-link": {
+                "font-size": "16px",
+                "text-align": "left",
+                "margin": "0px",
+                "border-radius": "8px",
+                "color": "#2c3e50",
+                "--hover-color": "#e3f2fd"
+            },
+            "nav-link-selected": {"background-color": "#4b6cb7", "color": "white"}
+        }
+    )
+
+    # Update current page
+    if selected and selected != st.session_state.get('current_page', 'Dashboard'):
+        st.session_state.current_page = selected
+        st.rerun()
+
+    # User info section
+    if st.session_state.get('authenticated', False):
+        st.markdown("---")
+        st.markdown(f"""
+        <div style="text-align: center; padding: 1rem; background-color: white; border-radius: 8px; margin-top: 1rem;">
+            <p style="margin: 0; color: #2c3e50; font-weight: bold;">
+                👤 {st.session_state.get('current_user', {}).get('username', 'User')}
+            </p>
+            <p style="margin: 0; color: #666; font-size: 0.8rem;">
+                {'Admin' if st.session_state.get('is_admin', False) else 'User'}
+            </p>
+        </div>
+        """, unsafe_allow_html=True)
+
+        if st.button("🚪 Logout", key="sidebar_logout", use_container_width=True):
+            st.session_state.authenticated = False
+            st.session_state.is_admin = False
+            st.session_state.current_user = None
+            st.success("Logged out successfully!")
+            st.rerun()
 
 def render_navbar():
     """Render the top navigation bar."""
@@ -302,27 +343,27 @@ def render_navbar():
             <div class="logo">Financial Inclusion App</div>
             <div class="nav-links">
     """, unsafe_allow_html=True)
-    
+
     # Only show navigation if user is authenticated
     if st.session_state.authenticated:
         for page_name in PAGES:
             # Skip admin panel if not admin
             if page_name == "Admin Panel" and not st.session_state.is_admin:
                 continue
-                
+
             active = "active" if st.session_state.current_page == page_name else ""
             st.markdown(
                 f'<a href="?page={page_name}" class="nav-link {active}">{page_name}</a>',
                 unsafe_allow_html=True
             )
-        
+
         # Logout button
         if st.button("Logout", key="logout_btn"):
             st.session_state.authenticated = False
             st.session_state.is_admin = False
             st.session_state.current_user = None
             st.rerun()
-    
+
     st.markdown("""
             </div>
         </div>
@@ -333,23 +374,23 @@ async def render_page(page_name: str) -> None:
     if page_name not in PAGES:
         page_name = "Dashboard"
         st.session_state.current_page = "Dashboard"
-    
+
     page_config = PAGES[page_name]
-    
+
     # Check authentication
     if page_config["requires_auth"] and not st.session_state.authenticated:
         st.warning("Please log in to access this page.")
         st.session_state.current_page = "Login"
         st.rerun()
         return
-    
+
     # Check admin access
     if page_config.get("requires_admin", False) and not st.session_state.is_admin:
         st.error("You don't have permission to access this page.")
         st.session_state.current_page = "Dashboard"
         st.rerun()
         return
-    
+
     # Render the page
     try:
         await page_config["module"].show()
@@ -359,104 +400,91 @@ async def render_page(page_name: str) -> None:
 
 async def main():
     """Main application function."""
-    # Initialize session state
-    if 'authenticated' not in st.session_state:
-        st.session_state.authenticated = False
-        st.session_state.is_admin = False
-        st.session_state.current_user = None
-
     # Check authentication
-    if not st.session_state.authenticated:
-        # Simple login form - no dependencies on external modules
-        st.title("🔑 SDG Finance Platform")
-        st.markdown("---")
-
-        st.subheader("Please log in to continue")
-
-        with st.form("login_form"):
-            username = st.text_input("Username", placeholder="Enter your username")
-            password = st.text_input("Password", type="password", placeholder="Enter your password")
-
-            col1, col2 = st.columns(2)
-            with col1:
-                login_button = st.form_submit_button("Login", use_container_width=True)
-            with col2:
-                st.form_submit_button("Forgot Password?", use_container_width=True)
-
-        if login_button:
-            if username and password:
-                # Simple authentication for demo purposes
-                if username == "admin" and password == "password":
-                    st.session_state.authenticated = True
-                    st.session_state.is_admin = True
-                    st.session_state.current_user = username
-                    st.success("Login successful! Redirecting...")
-                    st.rerun()
-                elif username == "user" and password == "password":
-                    st.session_state.authenticated = True
-                    st.session_state.is_admin = False
-                    st.session_state.current_user = username
-                    st.success("Login successful! Redirecting...")
-                    st.rerun()
+    if not st.session_state.get('authenticated', False):
+        # Render login page
+        if 'auth' in PAGE_MODULES:
+            try:
+                if hasattr(PAGE_MODULES['auth'], 'show'):
+                    if asyncio.iscoroutinefunction(PAGE_MODULES['auth'].show):
+                        await PAGE_MODULES['auth'].show()
+                    else:
+                        PAGE_MODULES['auth'].show()
                 else:
-                    st.error("Invalid username or password")
-            else:
-                st.error("Please enter both username and password")
-
-        st.markdown("---")
-        st.markdown("**Demo Accounts:**")
-        st.markdown("- Username: `admin`, Password: `password` (Admin access)")
-        st.markdown("- Username: `user`, Password: `password` (User access)")
-
+                    st.error("Auth module has no 'show' method")
+            except Exception as e:
+                st.error(f"Error in auth module: {str(e)}")
+        else:
+            st.error("Authentication module not found")
         return
+    # Get current page
+    current_page = st.session_state.get('current_page', 'Dashboard')
 
-    # User is authenticated - show main application
-    st.title("🌍 SDG Finance Platform Dashboard")
-    st.success(f"Welcome back, {st.session_state.current_user}!")
+    # Create main layout
+    col1, col2 = st.columns([1, 4])
 
-    # Simple navigation
-    st.markdown("---")
-    pages = ["Dashboard", "AI Recommendations", "Transactions", "Crowdfunding", "Microloans", "Poverty Map", "Profile"]
-    if st.session_state.is_admin:
-        pages.append("Admin Panel")
+    # Render the sidebar in the first column
+    with col1:
+        render_sidebar()
 
-    if 'current_page' not in st.session_state:
-        st.session_state.current_page = "Dashboard"
+    # Render the main content in the second column
+    with col2:
+        # Render the current page
+        if current_page in PAGES:
+            try:
+                page_config = PAGES[current_page]
+                # Check if module has an async show method
+                if hasattr(page_config["module"], 'show') and asyncio.iscoroutinefunction(page_config["module"].show):
+                    await page_config["module"].show()
+                else:
+                    page_config["module"].show()
+            except Exception as e:
+                st.error(f"Error loading page: {str(e)}")
+                logger.error(f"Error in page {current_page}: {str(e)}")
+        else:
+            st.warning("Page not found. Redirecting to dashboard...")
+            st.session_state.current_page = "Dashboard"
+            st.rerun()
 
-    selected_page = st.selectbox("Navigate to:", pages, index=pages.index(st.session_state.current_page) if st.session_state.current_page in pages else 0)
+    # Add footer
+    st.markdown("""
+    <style>
+        .footer {
+            padding: 1rem 0;
+            margin-top: 2rem;
+            text-align: center;
+            color: #666;
+            font-size: 0.8rem;
+            border-top: 1px solid #e0e0e0;
+        }
+        .stTextInput > div > div > input,
+        .stTextArea > div > div > textarea,
+        .stSelectbox > div > div > div,
+        .stNumberInput > div > div > input,
+        .stDateInput > div > div > input {
+            border-radius: 0.375rem;
+            border: 1px solid #d1d5db;
+            padding: 0.5rem 0.75rem;
+        }
 
-    if selected_page != st.session_state.current_page:
-        st.session_state.current_page = selected_page
-        st.rerun()
+        /* Table styling */
+        .stDataFrame {
+            border-radius: 0.5rem;
+            overflow: hidden;
+        }
 
-    # Show current page content
-    st.subheader(f"📊 {st.session_state.current_page}")
-    st.write(f"Welcome to the {st.session_state.current_page.lower()} page!")
-
-    if st.session_state.current_page == "Dashboard":
-        st.write("This is your main dashboard with an overview of all activities.")
-    elif st.session_state.current_page == "AI Recommendations":
-        st.write("AI-powered recommendations for financial decisions.")
-    elif st.session_state.current_page == "Transactions":
-        st.write("View and manage your financial transactions.")
-    elif st.session_state.current_page == "Crowdfunding":
-        st.write("Support community projects through crowdfunding.")
-    elif st.session_state.current_page == "Microloans":
-        st.write("Apply for or manage microloans.")
-    elif st.session_state.current_page == "Poverty Map":
-        st.write("Interactive map showing poverty indicators.")
-    elif st.session_state.current_page == "Profile":
-        st.write("Manage your profile and account settings.")
-    elif st.session_state.current_page == "Admin Panel":
-        st.write("Administrative tools and system management.")
-
-    # Logout button
-    if st.button("🚪 Logout", key="logout_btn"):
-        st.session_state.authenticated = False
-        st.session_state.is_admin = False
-        st.session_state.current_user = None
-        st.success("Logged out successfully!")
-        st.rerun()
+        /* Hide Streamlit branding */
+        #MainMenu {visibility: hidden;}
+        footer {visibility: hidden;}
+        header {visibility: hidden;}
+    </style>
+    <div class="footer">
+        2023 SDG Finance Platform | Version 1.0.0 |
+        <a href="#" style="color: #4b6cb7; text-decoration: none;">Help</a> |
+        <a href="#" style="color: #4b6cb7; text-decoration: none;">Terms</a> |
+        <a href="#" style="color: #4b6cb7; text-decoration: none;">Privacy</a>
+    </div>
+    """, unsafe_allow_html=True)
 
 def run():
     """Run the Streamlit app."""
@@ -494,7 +522,7 @@ if __name__ == "__main__":
             print("\nFor production with specific settings:")
             print(f"    {sys.executable} -m streamlit run --server.port=8501 --server.address=0.0.0.0 {Path(__file__).name}")
             print("\n" + "="*60 + "\n")
-            
+
             # Try to run with default settings
             try:
                 run_streamlit()
