@@ -1,0 +1,15 @@
+{
+  "name": "sdg1-frontend",
+  "version": "1.0.0",
+  "description": "Frontend for SDG 1: No Poverty Application",
+  "main": "index.html",
+  "scripts": {
+    "dev": "echo 'Frontend served by FastAPI backend'",
+    "build": "echo 'No build step required for HTML/CSS/JS frontend'"
+  },
+  "dependencies": {},
+  "devDependencies": {},
+  "keywords": ["sdg", "poverty", "financial", "frontend"],
+  "author": "SDG1 Application",
+  "license": "MIT"
+}
