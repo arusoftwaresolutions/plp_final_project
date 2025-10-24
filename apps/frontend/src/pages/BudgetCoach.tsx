@@ -1,18 +1,55 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
+import { useAuth } from "../contexts/AuthContext";
 
 export default function BudgetCoach() {
+  const { user } = useAuth();
   const [activeTab, setActiveTab] = useState("dashboard");
-  const [income, setIncome] = useState(3000);
-  const [expenses, setExpenses] = useState([
-    { category: "Housing", amount: 1000, type: "fixed" },
-    { category: "Food", amount: 400, type: "variable" },
-    { category: "Transportation", amount: 300, type: "fixed" },
-    { category: "Utilities", amount: 150, type: "fixed" },
-    { category: "Entertainment", amount: 200, type: "variable" },
-    { category: "Healthcare", amount: 100, type: "variable" }
-  ]);
+  const [income, setIncome] = useState(0);
+  const [expenses, setExpenses] = useState<Array<{category: string, amount: number, type: string}>>([]);
   const [savingsGoal, setSavingsGoal] = useState(500);
+  const [loading, setLoading] = useState(true);
+  
+  useEffect(() => {
+    if (user) {
+      // Set income from user data
+      setIncome(user.monthlyIncome || 0);
+      
+      // Load user's expense data from localStorage or set defaults
+      const savedExpenses = localStorage.getItem(`expenses_${user.id}`);
+      if (savedExpenses) {
+        setExpenses(JSON.parse(savedExpenses));
+      } else {
+        // Set some default expenses based on income
+        const defaultExpenses = [
+          { category: "Housing", amount: Math.round(user.monthlyIncome * 0.3) || 800, type: "fixed" },
+          { category: "Food", amount: Math.round(user.monthlyIncome * 0.15) || 400, type: "variable" },
+          { category: "Transportation", amount: Math.round(user.monthlyIncome * 0.1) || 200, type: "fixed" },
+          { category: "Utilities", amount: Math.round(user.monthlyIncome * 0.05) || 100, type: "fixed" }
+        ];
+        setExpenses(defaultExpenses);
+      }
+      
+      const savedSavingsGoal = localStorage.getItem(`savingsGoal_${user.id}`);
+      if (savedSavingsGoal) {
+        setSavingsGoal(parseFloat(savedSavingsGoal));
+      }
+    }
+    setLoading(false);
+  }, [user]);
+  
+  // Save data to localStorage when changed
+  useEffect(() => {
+    if (user && expenses.length > 0) {
+      localStorage.setItem(`expenses_${user.id}`, JSON.stringify(expenses));
+    }
+  }, [expenses, user]);
+  
+  useEffect(() => {
+    if (user && savingsGoal > 0) {
+      localStorage.setItem(`savingsGoal_${user.id}`, savingsGoal.toString());
+    }
+  }, [savingsGoal, user]);
   const [newExpense, setNewExpense] = useState({ category: "", amount: "", type: "variable" });
 
   const totalExpenses = expenses.reduce((sum, expense) => sum + expense.amount, 0);
@@ -46,8 +83,12 @@ export default function BudgetCoach() {
       <div className="max-w-7xl mx-auto px-4">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-4xl font-bold text-gray-900 mb-2">Financial Dashboard</h1>
-          <p className="text-xl text-gray-600">Take control of your financial future</p>
+          <h1 className="text-4xl font-bold text-gray-900 mb-2">
+            {user ? `Welcome back, ${user.name}!` : 'Financial Dashboard'}
+          </h1>
+          <p className="text-xl text-gray-600">
+            {user ? 'Here\'s your personalized financial overview' : 'Take control of your financial future'}
+          </p>
         </div>
 
         {/* Tabs */}
@@ -70,6 +111,14 @@ export default function BudgetCoach() {
           </div>
         </div>
 
+        {/* Loading State */}
+        {loading ? (
+          <div className="flex justify-center items-center py-20">
+            <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-emerald-600"></div>
+            <span className="ml-4 text-xl text-gray-600">Loading your dashboard...</span>
+          </div>
+        ) : (
+          <>
         {/* Dashboard Tab */}
         {activeTab === "dashboard" && (
           <div className="grid lg:grid-cols-3 gap-8">
@@ -267,6 +316,8 @@ export default function BudgetCoach() {
               </div>
             </div>
           </div>
+        )}
+          </>
         )}
       </div>
     </div>

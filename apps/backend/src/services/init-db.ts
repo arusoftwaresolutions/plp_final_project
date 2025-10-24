@@ -53,8 +53,10 @@ export async function initializeDatabase() {
           CREATE TABLE users (
             id SERIAL PRIMARY KEY,
             name TEXT NOT NULL,
-            email TEXT UNIQUE,
-            region_code TEXT
+            email TEXT UNIQUE NOT NULL,
+            password TEXT NOT NULL,
+            region_code TEXT,
+            created_at TIMESTAMP DEFAULT NOW()
           )
         `
       },

@@ -4,6 +4,7 @@ import helmet from "helmet";
 import dotenv from "dotenv";
 import { router as healthRouter } from "./routes/health.js";
 import { router as usersRouter } from "./routes/users.js";
+import { router as householdsRouter } from "./routes/households.js";
 import { router as transactionsRouter } from "./routes/transactions.js";
 import { router as aiRouter } from "./routes/ai.js";
 import { router as authRouter } from "./routes/auth.js";
@@ -21,6 +22,7 @@ app.use(express.json());
 app.use("/api/health", healthRouter);
 app.use("/api/auth", authRouter);
 app.use("/api/users", usersRouter);
+app.use("/api/households", householdsRouter);
 app.use("/api/transactions", transactionsRouter);
 app.use("/api/ai", aiRouter);
 

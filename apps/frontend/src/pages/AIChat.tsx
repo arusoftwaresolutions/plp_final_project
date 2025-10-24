@@ -1,5 +1,6 @@
 import React, { useState } from "react";
-
+import { Link } from "react-router-dom";
+import { useAuth } from "../contexts/AuthContext";
 interface Message {
   id: string;
   text: string;
@@ -8,10 +9,11 @@ interface Message {
 }
 
 export default function AIChat() {
+  const { user } = useAuth();
   const [messages, setMessages] = useState<Message[]>([
     {
       id: "1",
-      text: "Hello! I'm your personal financial advisor. I'm here to help you make smart financial decisions, create budgets, find savings opportunities, and plan for your future. What would you like to discuss today?",
+      text: `Hello ${user?.name || ''}! I'm your personal financial advisor. I'm here to help you make smart financial decisions, create budgets, find savings opportunities, and plan for your future based on your specific situation. What would you like to discuss today?`,
       isUser: false,
       timestamp: new Date()
     }
@@ -43,9 +45,10 @@ export default function AIChat() {
     setIsLoading(true);
 
     try {
-      // Call the backend AI service
-      const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "";
-      const response = await fetch(`${API_BASE_URL}/api/ai/budget/1`, {
+      // Call the backend AI service with user's household ID
+      const API_BASE_URL = "https://poverty-alleviation.onrender.com";
+      const householdId = user?.householdId || 1;
+      const response = await fetch(`${API_BASE_URL}/api/ai/budget/${householdId}`, {
         method: "GET",
         headers: {
           "Content-Type": "application/json"

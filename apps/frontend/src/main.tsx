@@ -1,6 +1,7 @@
 import React from "react";
 import { createRoot } from "react-dom/client";
-import { BrowserRouter, Routes, Route, Link, useLocation } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Link, useLocation, Navigate } from "react-router-dom";
+import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import Home from "./pages/Home";
 import BudgetCoach from "./pages/BudgetCoach";
 import Funding from "./pages/Funding";
@@ -12,14 +13,21 @@ import "./styles.css";
 
 const Navigation = () => {
   const location = useLocation();
+  const { isAuthenticated, user, logout } = useAuth();
   
-  const navItems = [
-    { path: "/", label: "Home", icon: "🏠" },
-    { path: "/coach", label: "Budget Coach", icon: "💰" },
+  const publicNavItems = [
+    { path: "/", label: "Home", icon: "🏠" }
+  ];
+  
+  const privateNavItems = [
+    { path: "/coach", label: "Dashboard", icon: "📊" },
     { path: "/funding", label: "Funding", icon: "🚀" },
     { path: "/loans", label: "Microloans", icon: "📈" },
-    { path: "/wealth-map", label: "Wealth Map", icon: "🗺️" }
+    { path: "/wealth-map", label: "Wealth Map", icon: "🗺️" },
+    { path: "/ai-chat", label: "AI Advisor", icon: "🤖" }
   ];
+
+  const navItems = isAuthenticated ? privateNavItems : publicNavItems;
 
   return (
     <nav className="bg-gradient-to-r from-emerald-600 to-teal-700 shadow-lg">
@@ -49,31 +57,60 @@ const Navigation = () => {
             ))}
           </div>
           
-          <Link to="/auth" className="bg-white text-emerald-600 px-4 py-2 rounded-lg font-medium hover:bg-emerald-50 transition-colors">
-            Get Started
-          </Link>
+          <div className="flex items-center space-x-4">
+            {isAuthenticated ? (
+              <>
+                <span className="text-white/80 text-sm">Welcome, {user?.name}</span>
+                <button 
+                  onClick={logout}
+                  className="bg-white/20 text-white px-4 py-2 rounded-lg font-medium hover:bg-white/30 transition-colors"
+                >
+                  Logout
+                </button>
+              </>
+            ) : (
+              <Link to="/auth" className="bg-white text-emerald-600 px-4 py-2 rounded-lg font-medium hover:bg-emerald-50 transition-colors">
+                Get Started
+              </Link>
+            )}
+          </div>
         </div>
       </div>
     </nav>
   );
 };
 
-const App = () => (
-  <BrowserRouter>
+const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
+  const { isAuthenticated } = useAuth();
+  return isAuthenticated ? <>{children}</> : <Navigate to="/auth" replace />;
+};
+
+const AppRoutes = () => {
+  const { isAuthenticated } = useAuth();
+  
+  return (
     <div className="min-h-screen bg-gradient-to-br from-emerald-50 to-teal-50">
       <Navigation />
       <main>
         <Routes>
           <Route path="/" element={<Home />} />
-          <Route path="/coach" element={<BudgetCoach />} />
-          <Route path="/funding" element={<Funding />} />
-          <Route path="/loans" element={<Microloan />} />
-          <Route path="/wealth-map" element={<WealthMap />} />
-          <Route path="/auth" element={<Auth />} />
-          <Route path="/ai-chat" element={<AIChat />} />
+          <Route path="/auth" element={isAuthenticated ? <Navigate to="/coach" replace /> : <Auth />} />
+          <Route path="/coach" element={<ProtectedRoute><BudgetCoach /></ProtectedRoute>} />
+          <Route path="/funding" element={<ProtectedRoute><Funding /></ProtectedRoute>} />
+          <Route path="/loans" element={<ProtectedRoute><Microloan /></ProtectedRoute>} />
+          <Route path="/wealth-map" element={<ProtectedRoute><WealthMap /></ProtectedRoute>} />
+          <Route path="/ai-chat" element={<ProtectedRoute><AIChat /></ProtectedRoute>} />
         </Routes>
       </main>
     </div>
+  );
+};
+
+const App = () => (
+  <BrowserRouter>
+    <AuthProvider>
+      <AppRoutes />
+    </AuthProvider>
   </BrowserRouter>
 );
 
