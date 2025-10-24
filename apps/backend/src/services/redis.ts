@@ -8,6 +8,7 @@ const url = process.env.REDIS_URL?.trim();
 const createMockRedis = () => ({
   set: async () => "OK",
   setEx: async () => "OK",
+  expire: async () => 1,
   get: async () => null,
   del: async () => 1,
   connect: async () => {},

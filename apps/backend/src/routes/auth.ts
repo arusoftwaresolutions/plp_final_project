@@ -11,7 +11,13 @@ router.post("/request-otp", async (req, res) => {
   if (!parsed.success) return res.status(400).json({ error: "Invalid payload" });
   const { email } = parsed.data;
   const code = Math.floor(100000 + Math.random() * 900000).toString();
-  await redis.setEx(`otp:${email}`, 300, code);
+  // Use type assertion to handle both real and mock Redis
+  if ('setEx' in redis && typeof redis.setEx === 'function') {
+    await (redis as any).setEx(`otp:${email}`, 300, code);
+  } else {
+    await (redis as any).set(`otp:${email}`, code);
+    if ('expire' in redis) await (redis as any).expire(`otp:${email}`, 300);
+  }
   // In production, send via email/SMS. Do NOT return code.
   res.json({ message: "OTP sent" });
 });
