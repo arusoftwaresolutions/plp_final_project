@@ -6,6 +6,8 @@ import BudgetCoach from "./pages/BudgetCoach";
 import Funding from "./pages/Funding";
 import Microloan from "./pages/Microloan";
 import WealthMap from "./pages/WealthMap";
+import Auth from "./pages/Auth";
+import AIChat from "./pages/AIChat";
 import "./styles.css";
 
 const Navigation = () => {
@@ -20,12 +22,12 @@ const Navigation = () => {
   ];
 
   return (
-    <nav className="bg-gradient-to-r from-blue-600 to-purple-700 shadow-lg">
+    <nav className="bg-gradient-to-r from-emerald-600 to-teal-700 shadow-lg">
       <div className="max-w-7xl mx-auto px-4">
         <div className="flex items-center justify-between h-16">
           <Link to="/" className="flex items-center space-x-2">
             <div className="w-8 h-8 bg-white rounded-lg flex items-center justify-center">
-              <span className="text-blue-600 font-bold text-lg">F</span>
+              <span className="text-emerald-600 font-bold text-lg">$</span>
             </div>
             <span className="text-white font-bold text-xl">FinanceFlow</span>
           </Link>
@@ -47,9 +49,9 @@ const Navigation = () => {
             ))}
           </div>
           
-          <button className="bg-white text-blue-600 px-4 py-2 rounded-lg font-medium hover:bg-blue-50 transition-colors">
+          <Link to="/auth" className="bg-white text-emerald-600 px-4 py-2 rounded-lg font-medium hover:bg-emerald-50 transition-colors">
             Get Started
-          </button>
+          </Link>
         </div>
       </div>
     </nav>
@@ -58,7 +60,7 @@ const Navigation = () => {
 
 const App = () => (
   <BrowserRouter>
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
+    <div className="min-h-screen bg-gradient-to-br from-emerald-50 to-teal-50">
       <Navigation />
       <main>
         <Routes>
@@ -67,6 +69,8 @@ const App = () => (
           <Route path="/funding" element={<Funding />} />
           <Route path="/loans" element={<Microloan />} />
           <Route path="/wealth-map" element={<WealthMap />} />
+          <Route path="/auth" element={<Auth />} />
+          <Route path="/ai-chat" element={<AIChat />} />
         </Routes>
       </main>
     </div>
