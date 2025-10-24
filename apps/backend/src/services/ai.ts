@@ -20,7 +20,7 @@ try {
     console.warn(`System prompt not found at ${systemPromptPath}, using default`);
   }
 } catch (error) {
-  console.warn(`Failed to read system prompt: ${error.message}, using default`);
+  console.warn(`Failed to read system prompt: ${error instanceof Error ? error.message : 'Unknown error'}, using default`);
 }
 
 const model = process.env.MODEL_NAME || "gpt-4o-mini";

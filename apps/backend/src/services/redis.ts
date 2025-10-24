@@ -7,6 +7,7 @@ const url = process.env.REDIS_URL?.trim();
 // Create a mock redis client if no URL provided
 const createMockRedis = () => ({
   set: async () => "OK",
+  setEx: async () => "OK",
   get: async () => null,
   del: async () => 1,
   connect: async () => {},
@@ -20,7 +21,7 @@ export const redis = url && url !== ""
 
 if (url && url !== "") {
   redis.on("error", (err) => console.error("Redis Error", err));
-  (redis as any).connect().catch((e) => console.error("Redis connect error", e));
+  (redis as any).connect().catch((e: any) => console.error("Redis connect error", e));
 } else {
   console.warn("Redis URL not provided, using mock Redis client");
 }

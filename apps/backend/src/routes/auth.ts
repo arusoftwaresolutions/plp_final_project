@@ -11,7 +11,7 @@ router.post("/request-otp", async (req, res) => {
   if (!parsed.success) return res.status(400).json({ error: "Invalid payload" });
   const { email } = parsed.data;
   const code = Math.floor(100000 + Math.random() * 900000).toString();
-  await redis.set(`otp:${email}`, code, { EX: 300 });
+  await redis.setEx(`otp:${email}`, 300, code);
   // In production, send via email/SMS. Do NOT return code.
   res.json({ message: "OTP sent" });
 });
