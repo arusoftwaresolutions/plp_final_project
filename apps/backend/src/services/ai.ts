@@ -7,9 +7,21 @@ dotenv.config();
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const root = path.resolve(__dirname, "../../../");
+// Go from backend/dist/services to repo root: ../../../.. (4 levels up)
+const root = path.resolve(__dirname, "../../../../");
 const systemPromptPath = path.join(root, "ai", "system_prompt.txt");
-const systemPrompt = fs.readFileSync(systemPromptPath, "utf-8");
+
+// Add error handling and fallback
+let systemPrompt = "You are a helpful budgeting assistant. Provide clear, practical advice for low-income families.";
+try {
+  if (fs.existsSync(systemPromptPath)) {
+    systemPrompt = fs.readFileSync(systemPromptPath, "utf-8");
+  } else {
+    console.warn(`System prompt not found at ${systemPromptPath}, using default`);
+  }
+} catch (error) {
+  console.warn(`Failed to read system prompt: ${error.message}, using default`);
+}
 
 const model = process.env.MODEL_NAME || "gpt-4o-mini";
 const apiKey = process.env.OPENAI_API_KEY || "";
