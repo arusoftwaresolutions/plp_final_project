@@ -1,9 +1,12 @@
 import fs from "fs";
 import path from "path";
+import { fileURLToPath } from "url";
 import dotenv from "dotenv";
 import OpenAI from "openai";
 dotenv.config();
 
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 const root = path.resolve(__dirname, "../../../");
 const systemPromptPath = path.join(root, "ai", "system_prompt.txt");
 const systemPrompt = fs.readFileSync(systemPromptPath, "utf-8");
