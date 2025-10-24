@@ -1,7 +1,52 @@
 import React, { useState } from "react";
+import { Link } from "react-router-dom";
 
 export default function Funding() {
   const [activeCategory, setActiveCategory] = useState("business");
+  const [showApplicationModal, setShowApplicationModal] = useState(false);
+  const [selectedOpportunity, setSelectedOpportunity] = useState<any>(null);
+  const [applicationData, setApplicationData] = useState({
+    fullName: "",
+    email: "",
+    phone: "",
+    monthlyIncome: "",
+    householdSize: "",
+    requestedAmount: "",
+    businessDescription: "",
+    fundingPurpose: "",
+    experienceYears: ""
+  });
+
+  const handleApplyClick = (opportunity: any) => {
+    setSelectedOpportunity(opportunity);
+    setShowApplicationModal(true);
+  };
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    setApplicationData({
+      ...applicationData,
+      [e.target.name]: e.target.value
+    });
+  };
+
+  const handleSubmitApplication = (e: React.FormEvent) => {
+    e.preventDefault();
+    // TODO: Submit to backend
+    console.log("Application submitted:", { opportunity: selectedOpportunity, data: applicationData });
+    alert("Application submitted successfully! We'll review it within 2-3 business days.");
+    setShowApplicationModal(false);
+    setApplicationData({
+      fullName: "",
+      email: "",
+      phone: "",
+      monthlyIncome: "",
+      householdSize: "",
+      requestedAmount: "",
+      businessDescription: "",
+      fundingPurpose: "",
+      experienceYears: ""
+    });
+  };
 
   const categories = [
     { id: "business", label: "Business Growth", icon: "🚀" },
@@ -62,7 +107,7 @@ export default function Funding() {
         {/* Header */}
         <div className="text-center mb-12">
           <h1 className="text-4xl md:text-5xl font-bold text-gray-900 mb-6">
-            Access <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-purple-600">Growth Capital</span>
+            Access <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-600 to-teal-600">Growth Capital</span>
           </h1>
           <p className="text-xl text-gray-600 max-w-3xl mx-auto leading-relaxed">
             Discover vetted funding opportunities, grants, and investment options tailored to your financial goals and situation.
@@ -71,13 +116,13 @@ export default function Funding() {
 
         {/* Stats Cards */}
         <div className="grid md:grid-cols-3 gap-6 mb-12">
-          <div className="bg-gradient-to-r from-blue-500 to-blue-600 p-6 rounded-2xl text-white">
+          <div className="bg-gradient-to-r from-emerald-500 to-emerald-600 p-6 rounded-2xl text-white">
             <div className="text-3xl font-bold mb-2">$2.5M+</div>
-            <div className="text-blue-100">Total Funds Accessed</div>
+            <div className="text-emerald-100">Total Funds Accessed</div>
           </div>
-          <div className="bg-gradient-to-r from-purple-500 to-purple-600 p-6 rounded-2xl text-white">
+          <div className="bg-gradient-to-r from-teal-500 to-teal-600 p-6 rounded-2xl text-white">
             <div className="text-3xl font-bold mb-2">85%</div>
-            <div className="text-purple-100">Approval Rate</div>
+            <div className="text-teal-100">Approval Rate</div>
           </div>
           <div className="bg-gradient-to-r from-green-500 to-green-600 p-6 rounded-2xl text-white">
             <div className="text-3xl font-bold mb-2">48hrs</div>
@@ -94,8 +139,8 @@ export default function Funding() {
                 onClick={() => setActiveCategory(category.id)}
                 className={`flex items-center space-x-2 px-6 py-3 rounded-xl font-medium transition-all duration-200 ${
                   activeCategory === category.id
-                    ? "bg-blue-600 text-white shadow-lg"
-                    : "bg-white text-gray-700 hover:bg-blue-50 border border-gray-200"
+                    ? "bg-emerald-600 text-white shadow-lg"
+                    : "bg-white text-gray-700 hover:bg-emerald-50 border border-gray-200"
                 }`}
               >
                 <span>{category.icon}</span>
@@ -129,7 +174,10 @@ export default function Funding() {
                   ))}
                 </div>
                 
-                <button className="w-full bg-gradient-to-r from-blue-600 to-purple-600 text-white py-3 rounded-xl font-semibold hover:shadow-lg transform hover:-translate-y-1 transition-all duration-200">
+                <button 
+                  onClick={() => handleApplyClick(opportunity)}
+                  className="w-full bg-gradient-to-r from-emerald-600 to-teal-600 text-white py-3 rounded-xl font-semibold hover:shadow-lg transform hover:-translate-y-1 transition-all duration-200"
+                >
                   Apply Now
                 </button>
               </div>
@@ -138,18 +186,202 @@ export default function Funding() {
         </div>
 
         {/* Bottom CTA */}
-        <div className="mt-16 text-center bg-gradient-to-r from-blue-50 to-purple-50 p-12 rounded-3xl">
+        <div className="mt-16 text-center bg-gradient-to-r from-emerald-50 to-teal-50 p-12 rounded-3xl">
           <h2 className="text-3xl font-bold text-gray-900 mb-4">
             Need Personalized Funding Advice?
           </h2>
           <p className="text-lg text-gray-600 mb-8 max-w-2xl mx-auto">
             Our funding specialists can help you identify the best opportunities based on your unique situation and goals.
           </p>
-          <button className="bg-gradient-to-r from-blue-600 to-purple-600 text-white px-8 py-4 rounded-xl font-semibold text-lg hover:shadow-lg transform hover:scale-105 transition-all duration-200">
+          <Link 
+            to="/ai-chat"
+            className="inline-block bg-gradient-to-r from-emerald-600 to-teal-600 text-white px-8 py-4 rounded-xl font-semibold text-lg hover:shadow-lg transform hover:scale-105 transition-all duration-200"
+          >
             Get Expert Guidance
-          </button>
+          </Link>
         </div>
       </div>
+
+      {/* Application Modal */}
+      {showApplicationModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6 border-b border-gray-200">
+              <div className="flex justify-between items-center">
+                <h2 className="text-2xl font-bold text-gray-900">
+                  Apply for {selectedOpportunity?.title}
+                </h2>
+                <button 
+                  onClick={() => setShowApplicationModal(false)}
+                  className="text-gray-500 hover:text-gray-700 text-2xl"
+                >
+                  ×
+                </button>
+              </div>
+            </div>
+
+            <form onSubmit={handleSubmitApplication} className="p-6 space-y-4">
+              <div className="grid md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Full Name *
+                  </label>
+                  <input
+                    type="text"
+                    name="fullName"
+                    value={applicationData.fullName}
+                    onChange={handleInputChange}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                    placeholder="Your full name"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Email Address *
+                  </label>
+                  <input
+                    type="email"
+                    name="email"
+                    value={applicationData.email}
+                    onChange={handleInputChange}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                    placeholder="your@email.com"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="grid md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Phone Number
+                  </label>
+                  <input
+                    type="tel"
+                    name="phone"
+                    value={applicationData.phone}
+                    onChange={handleInputChange}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                    placeholder="(555) 123-4567"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Requested Amount *
+                  </label>
+                  <input
+                    type="number"
+                    name="requestedAmount"
+                    value={applicationData.requestedAmount}
+                    onChange={handleInputChange}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                    placeholder="$5,000"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="grid md:grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Monthly Income
+                  </label>
+                  <input
+                    type="number"
+                    name="monthlyIncome"
+                    value={applicationData.monthlyIncome}
+                    onChange={handleInputChange}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                    placeholder="$3,000"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Household Size
+                  </label>
+                  <input
+                    type="number"
+                    name="householdSize"
+                    value={applicationData.householdSize}
+                    onChange={handleInputChange}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                    placeholder="4"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Experience (Years)
+                  </label>
+                  <input
+                    type="number"
+                    name="experienceYears"
+                    value={applicationData.experienceYears}
+                    onChange={handleInputChange}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                    placeholder="2"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Business/Project Description *
+                </label>
+                <textarea
+                  name="businessDescription"
+                  value={applicationData.businessDescription}
+                  onChange={handleInputChange}
+                  rows={3}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                  placeholder="Describe your business or project..."
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  How will you use the funding? *
+                </label>
+                <textarea
+                  name="fundingPurpose"
+                  value={applicationData.fundingPurpose}
+                  onChange={handleInputChange}
+                  rows={3}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                  placeholder="Equipment, inventory, marketing, etc..."
+                  required
+                />
+              </div>
+
+              <div className="bg-emerald-50 p-4 rounded-lg">
+                <h4 className="font-semibold text-emerald-800 mb-2">📋 Application Review Process</h4>
+                <ul className="text-sm text-emerald-700 space-y-1">
+                  <li>• Initial review: 24-48 hours</li>
+                  <li>• Document verification: 2-3 business days</li>
+                  <li>• Final decision: 5-7 business days</li>
+                </ul>
+              </div>
+
+              <div className="flex space-x-4 pt-4">
+                <button
+                  type="button"
+                  onClick={() => setShowApplicationModal(false)}
+                  className="flex-1 px-6 py-3 border border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-50 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 px-6 py-3 bg-gradient-to-r from-emerald-600 to-teal-600 text-white rounded-lg font-semibold hover:shadow-lg transition-all duration-200"
+                >
+                  Submit Application
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
