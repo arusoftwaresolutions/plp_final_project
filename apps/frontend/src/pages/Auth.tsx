@@ -6,6 +6,8 @@ export default function Auth() {
   const [isLogin, setIsLogin] = useState(true);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+  const [showForm, setShowForm] = useState(true);
   const { login, register } = useAuth();
   const navigate = useNavigate();
   
@@ -24,22 +26,29 @@ export default function Auth() {
       [e.target.name]: e.target.value
     });
     if (error) setError('');
+    if (success) setSuccess('');
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError('');
+    setSuccess('');
     
     try {
       if (isLogin) {
         await login(formData.email, formData.password);
+        setSuccess('Login successful! Redirecting...');
+        setTimeout(() => {
+          navigate('/coach');
+        }, 1500);
       } else {
         if (formData.password !== formData.confirmPassword) {
           setError('Passwords do not match');
           setLoading(false);
           return;
         }
+        
         await register(
           formData.name,
           formData.email,
@@ -47,10 +56,28 @@ export default function Auth() {
           parseInt(formData.monthlyIncome) || 0,
           parseInt(formData.householdSize) || 1
         );
+        
+        setSuccess('Registration successful! Welcome to FinanceFlow!');
+        setShowForm(false);
+        
+        // Auto redirect to dashboard after showing success
+        setTimeout(() => {
+          navigate('/coach');
+        }, 2500);
       }
-      navigate('/coach');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Authentication failed');
+      console.error('Auth error:', err);
+      let errorMessage = 'Authentication failed';
+      
+      if (err instanceof Error) {
+        if (err.message.includes('json')) {
+          errorMessage = 'Server connection issue. Please try again.';
+        } else {
+          errorMessage = err.message;
+        }
+      }
+      
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -97,12 +124,33 @@ export default function Auth() {
             </div>
 
             {error && (
-              <div className="mb-4 p-4 bg-red-100 border border-red-400 text-red-700 rounded-lg">
+              <div className="mb-4 p-4 bg-red-100 border border-red-400 text-red-700 rounded-lg text-center">
+                <div className="flex items-center justify-center mb-2">
+                  <span className="text-red-500 text-xl mr-2">⚠️</span>
+                  <strong>Error</strong>
+                </div>
                 {error}
               </div>
             )}
             
-            <form onSubmit={handleSubmit} className="space-y-4">
+            {success && (
+              <div className="mb-4 p-4 bg-green-100 border border-green-400 text-green-700 rounded-lg text-center">
+                <div className="flex items-center justify-center mb-2">
+                  <span className="text-green-500 text-xl mr-2">✅</span>
+                  <strong>Success!</strong>
+                </div>
+                {success}
+                {!showForm && (
+                  <div className="mt-3 text-sm">
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-green-600 mx-auto mb-2"></div>
+                    Redirecting to your dashboard...
+                  </div>
+                )}
+              </div>
+            )}
+            
+            {showForm ? (
+              <form onSubmit={handleSubmit} className="space-y-4">
               {!isLogin && (
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -212,7 +260,23 @@ export default function Auth() {
                   isLogin ? "Sign In" : "Create Account"
                 )}
               </button>
-            </form>
+              </form>
+            ) : (
+              <div className="text-center py-8">
+                <div className="text-6xl mb-4">🎉</div>
+                <h3 className="text-xl font-semibold text-gray-900 mb-2">
+                  Welcome to FinanceFlow!
+                </h3>
+                <p className="text-gray-600 mb-4">
+                  Your account has been created successfully. You'll be redirected to your personalized financial dashboard shortly.
+                </p>
+                <div className="flex justify-center">
+                  <div className="animate-pulse bg-emerald-100 text-emerald-700 px-4 py-2 rounded-lg">
+                    Preparing your dashboard...
+                  </div>
+                </div>
+              </div>
+            )}
 
             <div className="mt-6 text-center">
               <Link to="/" className="text-emerald-600 hover:text-emerald-700 font-medium">

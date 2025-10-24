@@ -46,7 +46,7 @@ export default function AIChat() {
 
     try {
       // Call the backend AI service with user's household ID
-      const API_BASE_URL = "https://poverty-alleviation.onrender.com";
+      const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:3001";
       const householdId = user?.householdId || 1;
       const response = await fetch(`${API_BASE_URL}/api/ai/budget/${householdId}`, {
         method: "GET",

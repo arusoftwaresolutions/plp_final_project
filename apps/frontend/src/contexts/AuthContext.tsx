@@ -32,7 +32,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const API_BASE_URL = 'https://poverty-alleviation.onrender.com';
+  const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001';
 
   useEffect(() => {
     // Check for stored auth data on app load
@@ -69,11 +69,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Registration failed');
+        let errorMessage = 'Registration failed';
+        try {
+          const errorData = await response.json();
+          errorMessage = errorData.error || errorMessage;
+        } catch (jsonError) {
+          console.error('Error parsing error response:', jsonError);
+        }
+        throw new Error(errorMessage);
       }
 
-      const userData = await response.json();
+      let userData;
+      try {
+        userData = await response.json();
+      } catch (jsonError) {
+        console.error('Error parsing registration response:', jsonError);
+        throw new Error('Server response was invalid. Please try again.');
+      }
       setUser(userData);
       localStorage.setItem('user', JSON.stringify(userData));
     } catch (error) {
@@ -99,11 +111,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Login failed');
+        let errorMessage = 'Login failed';
+        try {
+          const errorData = await response.json();
+          errorMessage = errorData.error || errorMessage;
+        } catch (jsonError) {
+          console.error('Error parsing login error response:', jsonError);
+        }
+        throw new Error(errorMessage);
       }
 
-      const userData = await response.json();
+      let userData;
+      try {
+        userData = await response.json();
+      } catch (jsonError) {
+        console.error('Error parsing login response:', jsonError);
+        throw new Error('Server response was invalid. Please try again.');
+      }
       setUser(userData);
       localStorage.setItem('user', JSON.stringify(userData));
     } catch (error) {

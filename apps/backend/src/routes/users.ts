@@ -40,18 +40,24 @@ router.post("/register", async (req, res) => {
     
     const user = userResult.rows[0];
     
-    // Insert household if income/size provided
-    if (monthlyIncome > 0) {
-      const householdResult = await db.query(
-        "INSERT INTO households (user_id, household_size, monthly_income) VALUES ($1, $2, $3) RETURNING id",
-        [user.id, householdSize, monthlyIncome]
-      );
-      user.householdId = householdResult.rows[0].id;
-      user.monthlyIncome = monthlyIncome;
-      user.householdSize = householdSize;
-    }
+    // Always insert household record
+    const householdResult = await db.query(
+      "INSERT INTO households (user_id, household_size, monthly_income) VALUES ($1, $2, $3) RETURNING id",
+      [user.id, householdSize, monthlyIncome]
+    );
     
-    res.status(201).json(user);
+    // Build complete user response
+    const completeUser = {
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      householdId: householdResult.rows[0].id,
+      monthlyIncome,
+      householdSize
+    };
+    
+    console.log('Registration successful:', completeUser);
+    res.status(201).json(completeUser);
   } catch (error) {
     console.error('Registration error:', error);
     res.status(500).json({ error: "Internal server error" });
@@ -106,6 +112,7 @@ router.post("/login", async (req, res) => {
       householdSize: householdResult.rows[0]?.household_size || 1
     };
     
+    console.log('Login successful:', responseUser);
     res.json(responseUser);
   } catch (error) {
     console.error('Login error:', error);
