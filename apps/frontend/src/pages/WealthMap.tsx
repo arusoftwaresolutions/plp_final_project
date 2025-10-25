@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { Link } from "react-router-dom";
 import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
@@ -205,16 +206,27 @@ export default function WealthMap() {
               <p className="text-gray-600 mb-4">
                 Get tailored recommendations based on your location, skills, and financial goals.
               </p>
-              <button className="w-full bg-gradient-to-r from-blue-600 to-purple-600 text-white py-3 rounded-xl font-semibold hover:shadow-lg transform hover:-translate-y-1 transition-all duration-200">
+              <Link
+                to="/opportunities"
+                className="block w-full bg-gradient-to-r from-blue-600 to-purple-600 text-white py-3 rounded-xl font-semibold hover:shadow-lg transform hover:-translate-y-1 transition-all duration-200 text-center"
+              >
                 Find My Opportunities
-              </button>
+              </Link>
             </div>
           </div>
         </div>
 
         {/* Success Stories */}
         <div className="mt-16 bg-white rounded-3xl p-8 shadow-lg">
-          <h2 className="text-3xl font-bold text-center text-gray-900 mb-8">Success Stories</h2>
+          <div className="flex items-center justify-between mb-8">
+            <h2 className="text-3xl font-bold text-gray-900">Success Stories</h2>
+            <Link
+              to="/success-stories"
+              className="bg-emerald-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-emerald-700 transition-colors"
+            >
+              View All Stories
+            </Link>
+          </div>
           <div className="grid md:grid-cols-3 gap-8">
             <div className="text-center">
               <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -236,6 +248,30 @@ export default function WealthMap() {
               </div>
               <h3 className="font-semibold text-gray-900 mb-2">Maria's Education Center</h3>
               <p className="text-gray-600 text-sm">Built community learning hub serving 500+ students</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Financial Education CTA */}
+        <div className="mt-8 bg-gradient-to-r from-teal-50 to-emerald-50 rounded-3xl p-8">
+          <div className="text-center">
+            <h2 className="text-3xl font-bold text-gray-900 mb-4">📚 Build Your Financial Knowledge</h2>
+            <p className="text-gray-600 text-lg mb-6 max-w-2xl mx-auto">
+              Access comprehensive financial education resources designed to help you make informed decisions and grow your wealth.
+            </p>
+            <div className="flex flex-wrap gap-4 justify-center">
+              <Link
+                to="/education"
+                className="bg-emerald-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-emerald-700 transition-colors"
+              >
+                Start Learning
+              </Link>
+              <Link
+                to="/ai-chat"
+                className="bg-teal-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-teal-700 transition-colors"
+              >
+                Ask AI Questions
+              </Link>
             </div>
           </div>
         </div>

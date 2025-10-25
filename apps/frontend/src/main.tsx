@@ -9,6 +9,9 @@ import Microloan from "./pages/Microloan";
 import WealthMap from "./pages/WealthMap";
 import Auth from "./pages/Auth";
 import AIChat from "./pages/AIChat";
+import SuccessStories from "./pages/SuccessStories";
+import FinancialEducation from "./pages/FinancialEducation";
+import FindOpportunities from "./pages/FindOpportunities";
 import "./styles.css";
 
 const Navigation = () => {
@@ -100,6 +103,9 @@ const AppRoutes = () => {
           <Route path="/loans" element={<ProtectedRoute><Microloan /></ProtectedRoute>} />
           <Route path="/wealth-map" element={<ProtectedRoute><WealthMap /></ProtectedRoute>} />
           <Route path="/ai-chat" element={<ProtectedRoute><AIChat /></ProtectedRoute>} />
+          <Route path="/success-stories" element={<ProtectedRoute><SuccessStories /></ProtectedRoute>} />
+          <Route path="/education" element={<ProtectedRoute><FinancialEducation /></ProtectedRoute>} />
+          <Route path="/opportunities" element={<ProtectedRoute><FindOpportunities /></ProtectedRoute>} />
         </Routes>
       </main>
     </div>

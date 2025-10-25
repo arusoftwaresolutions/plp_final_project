@@ -45,21 +45,24 @@ export default function AIChat() {
     setIsLoading(true);
 
     try {
-      // Call the backend AI service with user's household ID
+      // Call the backend AI chat service with user's message and household context
       const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "https://poverty-alleviation.onrender.com";
       const householdId = user?.householdId || 1;
-      const response = await fetch(`${API_BASE_URL}/api/ai/budget/${householdId}`, {
-        method: "GET",
+      const response = await fetch(`${API_BASE_URL}/api/ai/chat/${householdId}`, {
+        method: "POST",
         headers: {
           "Content-Type": "application/json"
-        }
+        },
+        body: JSON.stringify({
+          message: inputText
+        })
       });
 
       if (response.ok) {
         const data = await response.json();
         const aiMessage: Message = {
           id: (Date.now() + 1).toString(),
-          text: data.advice || "I'm here to help with your financial questions. Can you tell me more about your specific situation?",
+          text: data.response || "I'm here to help with your financial questions. Can you tell me more about your specific situation?",
           isUser: false,
           timestamp: new Date()
         };

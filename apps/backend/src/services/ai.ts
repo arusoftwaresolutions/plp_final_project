@@ -32,24 +32,45 @@ type Tx = { type: string; category: string; amount: number };
 type AdviceInput = {
   household: { id: number; monthly_income: number; household_size: number; name: string };
   transactions: Tx[];
+  userMessage?: string;
 };
 
 export async function generateAdvice(input: AdviceInput): Promise<string> {
   const income = input.household.monthly_income;
   const lines = input.transactions.map((t) => `${t.category} = ${t.amount}`).join("; ");
-  const userPrompt = `Household size ${input.household.household_size}, income = ${income}. Expenses: ${lines}. Provide friendly budgeting tips.`;
+  
+  let userPrompt;
+  if (input.userMessage) {
+    userPrompt = `User question: "${input.userMessage}". Context - Household size: ${input.household.household_size}, income: ${income} ETB. Expenses: ${lines}. Please provide personalized financial advice based on their question and financial situation.`;
+  } else {
+    userPrompt = `Household size ${input.household.household_size}, income = ${income}. Expenses: ${lines}. Provide friendly budgeting tips.`;
+  }
 
   // Fallback advice if AI unavailable
   const fallback = () => {
     const total = input.transactions.reduce((s, t) => s + t.amount, 0);
     const left = Math.max(0, income - total);
-    return [
-      `You make about ${income.toLocaleString()} ETB each month.`,
-      `Rent and food take most of it — that's okay.`,
-      `Try buying staples in bulk and reduce small phone costs.`,
-      `You could aim to save about ${Math.floor(left * 0.1)} ETB this month.`,
-      `Keep going step by step — you're doing great!`,
-    ].join(" ");
+    
+    if (input.userMessage) {
+      // Provide contextual fallback based on user question
+      if (input.userMessage.toLowerCase().includes('budget')) {
+        return `Based on your ${income.toLocaleString()} ETB income and current expenses, I recommend the 50/30/20 rule: 50% for needs, 30% for wants, and 20% for savings. You have about ${left} ETB left after expenses. Would you like specific budget categories?`;
+      } else if (input.userMessage.toLowerCase().includes('save')) {
+        return `With your income of ${income.toLocaleString()} ETB, try to save at least ${Math.floor(left * 0.2)} ETB monthly. Start small - even 100 ETB per month builds good habits. Consider reducing variable expenses first.`;
+      } else if (input.userMessage.toLowerCase().includes('debt')) {
+        return `For debt management with ${income.toLocaleString()} ETB income, focus on high-interest debt first. List all debts, make minimum payments on all, then pay extra on the highest rate debt. Would you like a specific repayment strategy?`;
+      } else {
+        return `I understand your question about finances. With ${income.toLocaleString()} ETB monthly income and ${input.household.household_size} household members, let's work together on your specific financial goals. Can you be more specific about what you'd like help with?`;
+      }
+    } else {
+      return [
+        `You make about ${income.toLocaleString()} ETB each month.`,
+        `Rent and food take most of it — that's okay.`,
+        `Try buying staples in bulk and reduce small phone costs.`,
+        `You could aim to save about ${Math.floor(left * 0.1)} ETB this month.`,
+        `Keep going step by step — you're doing great!`,
+      ].join(" ");
+    }
   };
 
   if (!openai) return fallback();

@@ -54,25 +54,30 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       setLoading(true);
       
-      // For now, create a mock successful registration since backend endpoints may not be deployed yet
-      // This will be replaced once the backend is properly deployed with authentication
-      
-      // Simulate API call delay
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      
-      // Create user data from registration form
-      const userData: User = {
-        id: Date.now(), // Use timestamp as unique ID
-        name,
-        email,
-        monthlyIncome,
-        householdSize,
-        householdId: Date.now() // Mock household ID
-      };
-      
+      const response = await fetch(`${API_BASE_URL}/api/users/register`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name,
+          email,
+          password,
+          monthlyIncome,
+          householdSize
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || `Registration failed with status ${response.status}`);
+      }
+
+      const userData = await response.json();
       setUser(userData);
       localStorage.setItem('user', JSON.stringify(userData));
     } catch (error) {
+      console.error('Registration error:', error);
       throw error;
     } finally {
       setLoading(false);
@@ -83,26 +88,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       setLoading(true);
       
-      // For now, create a mock successful login since backend endpoints may not be deployed yet
-      // This will be replaced once the backend is properly deployed with authentication
-      
-      // Simulate API call delay
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // Create mock user data
-      const mockUser: User = {
-        id: Date.now(), // Use timestamp as unique ID
-        name: email.split('@')[0] || 'User',
-        email: email,
-        monthlyIncome: 3000,
-        householdSize: 4,
-        householdId: 1
-      };
-      
-      setUser(mockUser);
-      localStorage.setItem('user', JSON.stringify(mockUser));
+      const response = await fetch(`${API_BASE_URL}/api/users/login`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email,
+          password
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || `Login failed with status ${response.status}`);
+      }
+
+      const userData = await response.json();
+      setUser(userData);
+      localStorage.setItem('user', JSON.stringify(userData));
       
     } catch (error) {
+      console.error('Login error:', error);
       throw error;
     } finally {
       setLoading(false);
