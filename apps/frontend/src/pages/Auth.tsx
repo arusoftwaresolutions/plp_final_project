@@ -1,12 +1,16 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import Modal from '../components/Modal';
 
 export default function Auth() {
   const [isLogin, setIsLogin] = useState(true);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
+  const [showModal, setShowModal] = useState(false);
+  const [modalType, setModalType] = useState<'success' | 'error'>('success');
+  const [modalTitle, setModalTitle] = useState('');
+  const [modalMessage, setModalMessage] = useState('');
+  const [showModalSpinner, setShowModalSpinner] = useState(false);
   const [showForm, setShowForm] = useState(true);
   const { login, register } = useAuth();
   const navigate = useNavigate();
@@ -25,26 +29,41 @@ export default function Auth() {
       ...formData,
       [e.target.name]: e.target.value
     });
-    if (error) setError('');
-    if (success) setSuccess('');
+    // Close modal if it's open
+    if (showModal) setShowModal(false);
+  };
+
+  const showErrorModal = (message: string) => {
+    setModalType('error');
+    setModalTitle('Error');
+    setModalMessage(message);
+    setShowModalSpinner(false);
+    setShowModal(true);
+  };
+
+  const showSuccessModal = (message: string, withSpinner = false) => {
+    setModalType('success');
+    setModalTitle('Success!');
+    setModalMessage(message);
+    setShowModalSpinner(withSpinner);
+    setShowModal(true);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    setError('');
-    setSuccess('');
     
     try {
       if (isLogin) {
         await login(formData.email, formData.password);
-        setSuccess('Login successful! Redirecting...');
+        showSuccessModal('Login successful! Redirecting to your dashboard...', true);
         setTimeout(() => {
+          setShowModal(false);
           navigate('/coach');
-        }, 1500);
+        }, 2000);
       } else {
         if (formData.password !== formData.confirmPassword) {
-          setError('Passwords do not match');
+          showErrorModal('Passwords do not match. Please check and try again.');
           setLoading(false);
           return;
         }
@@ -57,27 +76,29 @@ export default function Auth() {
           parseInt(formData.householdSize) || 1
         );
         
-        setSuccess('Registration successful! Welcome to FinanceFlow!');
         setShowForm(false);
+        showSuccessModal('Welcome to FinanceFlow! Your account has been created successfully. Redirecting to your dashboard...', true);
         
-        // Auto redirect to dashboard after showing success
         setTimeout(() => {
+          setShowModal(false);
           navigate('/coach');
-        }, 2500);
+        }, 3000);
       }
     } catch (err) {
       console.error('Auth error:', err);
       let errorMessage = 'Authentication failed';
       
       if (err instanceof Error) {
-        if (err.message.includes('json')) {
-          errorMessage = 'Server connection issue. Please try again.';
+        if (err.message.includes('fetch')) {
+          errorMessage = 'Unable to connect to server. Please check your internet connection and try again.';
+        } else if (err.message.includes('json') || err.message.includes('Unexpected end')) {
+          errorMessage = 'Server is currently experiencing issues. Please try again in a moment.';
         } else {
           errorMessage = err.message;
         }
       }
       
-      setError(errorMessage);
+      showErrorModal(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -123,31 +144,6 @@ export default function Auth() {
               </button>
             </div>
 
-            {error && (
-              <div className="mb-4 p-4 bg-red-100 border border-red-400 text-red-700 rounded-lg text-center">
-                <div className="flex items-center justify-center mb-2">
-                  <span className="text-red-500 text-xl mr-2">⚠️</span>
-                  <strong>Error</strong>
-                </div>
-                {error}
-              </div>
-            )}
-            
-            {success && (
-              <div className="mb-4 p-4 bg-green-100 border border-green-400 text-green-700 rounded-lg text-center">
-                <div className="flex items-center justify-center mb-2">
-                  <span className="text-green-500 text-xl mr-2">✅</span>
-                  <strong>Success!</strong>
-                </div>
-                {success}
-                {!showForm && (
-                  <div className="mt-3 text-sm">
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-green-600 mx-auto mb-2"></div>
-                    Redirecting to your dashboard...
-                  </div>
-                )}
-              </div>
-            )}
             
             {showForm ? (
               <form onSubmit={handleSubmit} className="space-y-4">
@@ -295,6 +291,15 @@ export default function Auth() {
           </div>
         </div>
       </div>
+      
+      <Modal
+        isOpen={showModal}
+        onClose={() => setShowModal(false)}
+        type={modalType}
+        title={modalTitle}
+        message={modalMessage}
+        showSpinner={showModalSpinner}
+      />
     </div>
   );
 }

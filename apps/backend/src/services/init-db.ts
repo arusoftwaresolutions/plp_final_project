@@ -34,7 +34,13 @@ async function extensionExists(extensionName: string): Promise<boolean> {
 
 export async function initializeDatabase() {
   try {
-    console.log("🔍 Checking database state...");
+    console.log("🔍 Initializing database...");
+    
+    // Skip initialization if using mock database
+    if (!process.env.DATABASE_URL) {
+      console.log("⚠️  Skipping database initialization (using mock database)");
+      return;
+    }
 
     // Check and create PostGIS extension
     const hasPostGIS = await extensionExists('postgis');

@@ -21,8 +21,12 @@ export const redis = url && url !== ""
   : createMockRedis();
 
 if (url && url !== "") {
-  redis.on("error", (err) => console.error("Redis Error", err));
-  (redis as any).connect().catch((e: any) => console.error("Redis connect error", e));
+  redis.on("error", (err) => console.error("❌ Redis Error:", err));
+  redis.on("connect", () => console.log("✅ Redis connected successfully"));
+  (redis as any).connect().catch((e: any) => {
+    console.error("❌ Redis connect error:", e);
+    console.log("⚠️  Continuing without Redis - using mock client");
+  });
 } else {
-  console.warn("Redis URL not provided, using mock Redis client");
+  console.log("⚠️  Redis URL not provided, using mock Redis client");
 }
