@@ -119,6 +119,46 @@ export async function initializeDatabase() {
         console.log(`✅ Created table: ${table.name}`);
       } else {
         console.log(`✅ Table already exists: ${table.name}`);
+        
+        // Handle migration for users table to add missing columns
+        if (table.name === 'users') {
+          try {
+            // Check for missing columns
+            const columnCheck = await db.query(`
+              SELECT column_name FROM information_schema.columns 
+              WHERE table_name = 'users' AND column_name IN ('email', 'password')
+            `);
+            
+            const existingColumns = columnCheck.rows.map((row: any) => row.column_name);
+            
+            // Add email column if missing
+            if (!existingColumns.includes('email')) {
+              await db.query("ALTER TABLE users ADD COLUMN email TEXT");
+              // Set default email for existing users
+              await db.query("UPDATE users SET email = CONCAT(LOWER(name), '@example.com') WHERE email IS NULL");
+              // Make email unique and not null
+              await db.query("ALTER TABLE users ALTER COLUMN email SET NOT NULL");
+              await db.query("ALTER TABLE users ADD CONSTRAINT users_email_key UNIQUE (email)");
+              console.log(`✅ Added email column to users table`);
+            }
+            
+            // Add password column if missing
+            if (!existingColumns.includes('password')) {
+              await db.query("ALTER TABLE users ADD COLUMN password TEXT");
+              // Set a default password for existing users  
+              await db.query("UPDATE users SET password = '$2b$10$defaulthash' WHERE password IS NULL");
+              // Make password column NOT NULL after setting defaults
+              await db.query("ALTER TABLE users ALTER COLUMN password SET NOT NULL");
+              console.log(`✅ Added password column to users table`);
+            }
+            
+            if (existingColumns.includes('email') && existingColumns.includes('password')) {
+              console.log(`ℹ️  Users table already has email and password columns`);
+            }
+          } catch (error) {
+            console.log(`⚠️  Users table migration error:`, error instanceof Error ? error.message : error);
+          }
+        }
       }
     }
 
@@ -131,8 +171,8 @@ export async function initializeDatabase() {
       if (userCount === 0) {
         console.log("📝 Inserting sample data...");
         
-        // Insert sample user
-        await db.query("INSERT INTO users (name, region_code) VALUES ('Araya', 'ET-MK')");
+        // Insert sample user with password and email
+        await db.query("INSERT INTO users (name, email, password, region_code) VALUES ('Araya', 'araya@example.com', '$2b$10$defaulthash', 'ET-MK')");
         console.log("✅ Sample user inserted");
         
         // Check if households table exists and insert household
